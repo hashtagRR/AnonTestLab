@@ -170,30 +170,37 @@
   .cd-node.is-active { stroke: var(--signal); }
   .cd-node.is-end { stroke: var(--muted); }
   .cd-label { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--muted); letter-spacing: .02em; }
-  .cd-packet { offset-path: path("M30,112 L272,54 L512,168 L754,54 L972,112"); offset-rotate: 0deg; animation: cd-travel 9s linear infinite; }
-  @keyframes cd-travel { from { offset-distance: 0%; } to { offset-distance: 100%; } }
-  .cd-ring { fill: none; stroke: var(--signal); cx: 0; cy: 0; }
-  .cd-ring1 { r: 13; animation: cd-shed1 9s linear infinite; }
-  .cd-ring2 { r: 9; animation: cd-shed2 9s linear infinite; }
-  .cd-ring3 { r: 5.5; animation: cd-shed3 9s linear infinite; }
+  .cd-packet { animation: cd-travel 9s linear infinite; }
+  @keyframes cd-travel {
+    0%   { transform: translate(30px, 112px); }
+    25%  { transform: translate(272px, 54px); }
+    50%  { transform: translate(512px, 168px); }
+    75%  { transform: translate(754px, 54px); }
+    100% { transform: translate(972px, 112px); }
+  }
+  .cd-ring { fill: none; stroke: var(--signal); }
+  .cd-ring1 { animation: cd-shed1 9s linear infinite; }
+  .cd-ring2 { animation: cd-shed2 9s linear infinite; }
+  .cd-ring3 { animation: cd-shed3 9s linear infinite; }
   @keyframes cd-shed1 { 0%, 23% { opacity: .85; } 26%, 100% { opacity: 0; } }
   @keyframes cd-shed2 { 0%, 48% { opacity: .65; } 51%, 100% { opacity: 0; } }
   @keyframes cd-shed3 { 0%, 73% { opacity: .5; } 76%, 100% { opacity: 0; } }
-  .cd-core { r: 4; fill: var(--signal); cx: 0; cy: 0; }
+  .cd-core { fill: var(--signal); }
   @media (prefers-reduced-motion: reduce) {
-    .cd-packet { animation: none !important; offset-distance: 37%; }
-    .cd-ring1, .cd-ring2 { opacity: .6; }
-    .cd-ring3 { opacity: 0; }
+    .cd-packet { animation: none !important; transform: translate(370px, 100px); }
+    .cd-ring1 { opacity: 0; }
+    .cd-ring2 { opacity: .65; }
+    .cd-ring3 { opacity: .5; }
   }
   .cd-legend { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
   .cd-legend span { font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); display: flex; align-items: center; gap: 7px; }
   .cd-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
   /* ---------- contributions ---------- */
-  .contrib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 40px; }
+  .contrib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
   @media (max-width: 900px) { .contrib-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 620px) { .contrib-grid { grid-template-columns: 1fr; } }
-  .contrib { background: var(--surface); padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .contrib { background: var(--surface); border: 1px solid var(--line); padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; }
   .contrib .tag { font-family: "IBM Plex Mono", monospace; font-size: .68rem; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
   .contrib .tag code { color: var(--signal); }
   .contrib h3 { font-size: 1.05rem; font-weight: 700; font-family: "IBM Plex Sans", sans-serif; }
@@ -231,6 +238,7 @@
   footer .install {
     background: var(--surface-2); border: 1px solid var(--line); padding: 16px 18px;
     font-family: "IBM Plex Mono", monospace; font-size: .82rem; color: var(--text);
+    white-space: pre-line; line-height: 1.8;
   }
   footer .install .prompt { color: var(--signal); }
   footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -393,10 +401,10 @@ recall                         1.0000</div>
         <text class="cd-label" x="960" y="140" text-anchor="middle">EXIT</text>
 
         <g class="cd-packet">
-          <circle class="cd-ring cd-ring1"/>
-          <circle class="cd-ring cd-ring2"/>
-          <circle class="cd-ring cd-ring3"/>
-          <circle class="cd-core"/>
+          <circle class="cd-ring cd-ring1" cx="0" cy="0" r="13"/>
+          <circle class="cd-ring cd-ring2" cx="0" cy="0" r="9"/>
+          <circle class="cd-ring cd-ring3" cx="0" cy="0" r="5.5"/>
+          <circle class="cd-core" cx="0" cy="0" r="4"/>
         </g>
       </svg>
       <div class="cd-legend">
