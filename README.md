@@ -61,10 +61,49 @@ compromise-probability adversary is pure combinatorics on the paths
 ## Modes
 
 `tor_like` is a fixed preset: one path, three hops, random relay
-selection, no cover traffic, no splitting. `custom` makes everything
-configurable: relay count, path count and splitting, cover traffic,
-crypto algorithm, traffic shaping, WAN conditions, and which adversaries
-run.
+selection, no cover traffic, no splitting. `custom` makes every
+dimension below configurable.
+
+```
+                       AnonTestLab experiment
+                                │
+                 ┌──────────────┴──────────────┐
+                 ▼                              ▼
+            tor_like                          custom
+         (fixed preset)                (every stage below is configurable)
+                 │                              │
+      1 path, 3 hops,                           ▼
+      random selection,             network.nodes, as_groups
+      no cover, no split                        │
+                                                 ▼
+                                     routing.paths (1..N paths, each its
+                                     own strategy + path_length), split_strategy
+                                                 │
+                                                 ▼
+                                     traffic.real_rate, cover_rate,
+                                     cover_behaviour.drop_probability
+                                                 │
+                                                 ▼
+                                     traffic_shaping: cell_size,
+                                     mode (fixed_size | fixed_rate | none)
+                                                 │
+                                                 ▼
+                                     crypto.algorithm
+                                                 │
+                                                 ▼
+                                     link_conditions: latency, jitter,
+                                     loss, bandwidth (WAN realism)
+                                                 │
+                                                 ▼
+                                     adversary.types + per-type params
+                                     (observed_paths/observed_as, compromise
+                                     fraction/trials, watermark period/delay,
+                                     observation/classifier)
+                                                 │
+                                                 ▼
+                                     baseline (optional diff against
+                                     another experiment config)
+```
 
 ## Quickstart
 
