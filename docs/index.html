@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AnonTestLab</title>
+<meta name="description" content="A real network emulator for anonymous communication research: genuine OS processes, real onion circuits, a pluggable adversary framework.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #e5e9f1;
+    --line: #c7d0e0;
+    --text: #10192c;
+    --muted: #55617e;
+    --signal: #0e8a76;
+    --signal-soft: #0e8a761a;
+    --warn: #b3650f;
+    --warn-soft: #b3650f1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1220;
+      --surface: #121b2e;
+      --surface-2: #0e1626;
+      --line: #263353;
+      --text: #e7ecf7;
+      --muted: #8b96b8;
+      --signal: #4fd8c4;
+      --signal-soft: #4fd8c422;
+      --warn: #f0a860;
+      --warn-soft: #f0a86022;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1220;
+    --surface: #121b2e;
+    --surface-2: #0e1626;
+    --line: #263353;
+    --text: #e7ecf7;
+    --muted: #8b96b8;
+    --signal: #4fd8c4;
+    --signal-soft: #4fd8c422;
+    --warn: #f0a860;
+    --warn-soft: #f0a86022;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+  h1, h2, h3 { font-family: "Big Shoulders Display", "Arial Narrow", sans-serif; text-wrap: balance; margin: 0; letter-spacing: .01em; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  a { color: var(--signal); }
+
+  ::selection { background: var(--signal-soft); }
+
+  /* ---------- topbar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+  .brand { display: flex; align-items: baseline; gap: 8px; font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 1.3rem; letter-spacing: .02em; }
+  .brand .dot { color: var(--signal); }
+  .nav { display: flex; gap: 22px; font-family: "IBM Plex Mono", monospace; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+  .nav a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; padding-bottom: 3px; }
+  .nav a:hover { color: var(--text); border-color: var(--signal); }
+  .nav .gh { color: var(--text); }
+  @media (max-width: 720px) { .nav a:not(.gh) { display: none; } }
+
+  /* ---------- corner-bracket registration marks ---------- */
+  .instrument { position: relative; }
+  .instrument::before, .instrument::after,
+  .instrument > .br-tr, .instrument > .br-br {
+    content: ""; position: absolute; width: 14px; height: 14px;
+    border-color: var(--signal); opacity: .8;
+  }
+  .instrument::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+  .instrument > .br-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
+  .instrument::after { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
+  .instrument > .br-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+  @keyframes focus-in { from { opacity: 0; transform: scale(1.4); } to { opacity: .8; transform: scale(1); } }
+  .instrument.animate::before, .instrument.animate::after,
+  .instrument.animate > .br-tr, .instrument.animate > .br-br { animation: focus-in .5s ease-out both; }
+  .instrument.animate::after { animation-delay: .06s; }
+  .instrument.animate > .br-tr { animation-delay: .03s; }
+  .instrument.animate > .br-br { animation-delay: .09s; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: .78rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--signal); display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--signal); display: inline-block; }
+
+  section { padding: 84px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+
+  /* ---------- hero ---------- */
+  .hero { padding-top: 64px; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: start; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+  .hero h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 900; line-height: 1.02; }
+  .hero h1 .accent { color: var(--signal); }
+  .hero p.lede { font-size: 1.12rem; color: var(--muted); max-width: 46ch; margin-top: 20px; }
+  .hero-facts { display: flex; gap: 28px; margin-top: 32px; flex-wrap: wrap; }
+  .fact .num { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 2rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+  .fact .label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+
+  .term {
+    background: #0b1220; color: #d8e2f0; border: 1px solid var(--line);
+    padding: 20px 22px; font-family: "IBM Plex Mono", monospace; font-size: .82rem;
+    overflow-x: auto; white-space: pre;
+  }
+  .term .head { display: flex; gap: 6px; margin-bottom: 14px; }
+  .term .head span { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #37425c; }
+  .term .dim { color: #6f7ea3; }
+  .term .ok { color: #4fd8c4; }
+  .term .rule { color: #37425c; }
+
+  /* ---------- pipeline ---------- */
+  .pipeline { display: flex; flex-direction: column; gap: 0; margin-top: 40px; }
+  .step { display: grid; grid-template-columns: 64px 1fr; gap: 22px; position: relative; padding-bottom: 36px; }
+  .step:last-child { padding-bottom: 0; }
+  .step .idx {
+    font-family: "Big Shoulders Display", sans-serif; font-weight: 900; font-size: 1.6rem;
+    color: var(--bg); background: var(--signal); width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; z-index: 1;
+  }
+  .step::before {
+    content: ""; position: absolute; left: 21px; top: 44px; bottom: -14px; width: 2px;
+    background: var(--line);
+  }
+  .step:last-child::before { display: none; }
+  .step h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; }
+  .step p { color: var(--muted); margin: 0; max-width: 62ch; }
+  .step code { color: var(--signal); background: var(--signal-soft); padding: .1em .4em; }
+
+  /* ---------- contributions ---------- */
+  .contrib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 40px; }
+  @media (max-width: 900px) { .contrib-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .contrib-grid { grid-template-columns: 1fr; } }
+  .contrib { background: var(--surface); padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .contrib .tag { font-family: "IBM Plex Mono", monospace; font-size: .68rem; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+  .contrib .tag code { color: var(--signal); }
+  .contrib h3 { font-size: 1.05rem; font-weight: 700; font-family: "IBM Plex Sans", sans-serif; }
+  .contrib p { color: var(--muted); font-size: .93rem; margin: 0; }
+
+  /* ---------- spec tables ---------- */
+  .spec-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
+  @media (max-width: 780px) { .spec-cols { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  caption { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-bottom: 10px; }
+  th { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child, th:first-child { padding-left: 0; }
+  tr:last-child td { border-bottom: none; }
+  .cellname { font-family: "IBM Plex Mono", monospace; color: var(--signal); font-weight: 500; }
+  .tablewrap { overflow-x: auto; }
+
+  /* ---------- limitations ---------- */
+  .disclosure {
+    background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn);
+    padding: 28px 30px; margin-top: 36px;
+  }
+  .disclosure h3 { font-family: "IBM Plex Mono", monospace; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); font-weight: 600; margin-bottom: 18px; }
+  .disclosure ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px; }
+  .disclosure li { padding-left: 22px; position: relative; color: var(--muted); font-size: .95rem; }
+  .disclosure li::before { content: "◇"; position: absolute; left: 0; color: var(--warn); font-size: .8rem; top: .2em; }
+  .disclosure li b { color: var(--text); font-weight: 600; }
+  .disclosure li code { color: var(--text); background: var(--surface-2); padding: .05em .35em; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 64px 0 56px; }
+  .footer-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 40px; }
+  @media (max-width: 780px) { .footer-grid { grid-template-columns: 1fr; gap: 32px; } }
+  footer h4 { font-family: "IBM Plex Mono", monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+  footer .install {
+    background: var(--surface-2); border: 1px solid var(--line); padding: 16px 18px;
+    font-family: "IBM Plex Mono", monospace; font-size: .82rem; color: var(--text);
+  }
+  footer .install .prompt { color: var(--signal); }
+  footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  footer a { color: var(--muted); text-decoration: none; font-size: .92rem; }
+  footer a:hover { color: var(--signal); }
+  .foot-bottom { margin-top: 48px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-family: "IBM Plex Mono", monospace; font-size: .76rem; color: var(--muted); }
+
+  .cta-row { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px;
+    font-family: "IBM Plex Mono", monospace; font-size: .82rem; letter-spacing: .03em;
+    text-decoration: none; border: 1px solid var(--line); color: var(--text);
+  }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn:hover { border-color: var(--signal); color: var(--signal); }
+  .btn.primary:hover { color: var(--bg); background: var(--signal); border-color: var(--signal); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand">AnonTestLab<span class="dot">.</span></div>
+    <nav class="nav">
+      <a href="#pipeline">Pipeline</a>
+      <a href="#contributions">Contributions</a>
+      <a href="#spec">Spec</a>
+      <a href="#limitations">Limitations</a>
+      <a class="gh" href="https://github.com/hashtagRR/AnonTestLab">GitHub &rarr;</a>
+    </nav>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Real network emulator &middot; anonymity research</div>
+        <h1>Nothing here is a<br><span class="accent">timing model.</span></h1>
+        <p class="lede">
+          Relay nodes are genuine OS processes on real loopback sockets, wired into
+          telescoping onion circuits with real per-hop AEAD encryption and a real
+          ECDHE handshake. Every latency, delivery, and correlation number comes
+          from actually running the protocol, not from sampling a distribution.
+        </p>
+        <div class="cta-row">
+          <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab">View the source</a>
+          <a class="btn" href="#contributions">What's novel here</a>
+        </div>
+        <div class="hero-facts">
+          <div class="fact"><div class="num">6&times;3</div><div class="label">AEAD ciphers &times; ECDHE curves</div></div>
+          <div class="fact"><div class="num">4</div><div class="label">pluggable adversaries</div></div>
+          <div class="fact"><div class="num">254</div><div class="label">addressable relay processes</div></div>
+          <div class="fact"><div class="num">0.3</div><div class="label">current spec revision</div></div>
+        </div>
+      </div>
+      <div class="instrument animate">
+        <span class="br-tr"></span><span class="br-br"></span>
+        <div class="term">
+<div class="head"><span></span><span></span><span></span></div>Running tor-like...
+  10 relays ready
+  session 1/10 complete (37/37 real delivered, build 34ms)
+  session 2/10 complete (37/37 real delivered, build 29ms)
+  ...
+
+Results for tor-like
+<span class="rule">────────────────────────────────────────</span>
+real_packets_sent              375
+delivery_rate                  <span class="ok">1.0000</span>
+avg_latency_s                  0.0006  <span class="dim">&lt;- real measured latency</span>
+circuit_build_delay_s          0.0315  <span class="dim">&lt;- real measured handshake</span>
+correlation_success_rate       1.0000
+auc                            1.0000
+precision                      1.0000
+recall                         1.0000</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="wrap">
+    <div class="eyebrow">01 &middot; how a session actually runs</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Five real stages, no shortcuts</h2>
+    <div class="pipeline">
+      <div class="step">
+        <div class="idx">1</div>
+        <div>
+          <h3>YAML becomes an <code>ExperimentConfig</code></h3>
+          <p>Every dimension (topology, routing, traffic shape, crypto, WAN conditions, adversary) is one validated, reproducible config object, seeded once.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="idx">2</div>
+        <div>
+          <h3><code>spawn_relays()</code> forks N real subprocesses</h3>
+          <p>Each relay is its own OS process bound to its own loopback address, <code>127.0.0.1</code> through <code>127.0.0.254</code>, not a coroutine pretending to be a host.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="idx">3</div>
+        <div>
+          <h3><code>build_circuit()</code> telescopes hop by hop</h3>
+          <p>A real ephemeral ECDHE handshake and HKDF key derivation per hop, hop-local circuit IDs, independent forward and backward keys for the return path.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="idx">4</div>
+        <div>
+          <h3>Real onion-wrapped cells over real sockets</h3>
+          <p>Optionally padded to a fixed <code>cell_size</code>, optionally fragmented across cells, optionally slowed by per-node or per-edge WAN conditions.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="idx">5</div>
+        <div>
+          <h3>MetricsCollector meets a pluggable Adversary</h3>
+          <p>Measured latency, delivery, and bandwidth feed one or more adversary models; results land in <code>results/&lt;name&gt;/</code> with a baseline diff if one's set.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contributions">
+  <div class="wrap">
+    <div class="eyebrow">02 &middot; what this adds to the domain</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:34ch;">Seven things you can't test on a discrete-event simulator</h2>
+    <div class="contrib-grid">
+      <div class="contrib">
+        <div class="tag">RUNTIME &middot; <code>anontestlab.emulator</code></div>
+        <h3>Genuine emulation, not a timing model</h3>
+        <p>Real subprocesses, real sockets, real crypto cost. Latency and delivery are measured outcomes, never sampled from a distribution someone had to assume first.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">CRYPTO &middot; <code>crypto_layer.py</code></div>
+        <h3>Bidirectional onion encryption</h3>
+        <p>The return path is re-encrypted per hop with its own key, independent from the forward key but derived from the same handshake via HKDF, matching Tor's own directional key separation.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">ADVERSARY &middot; <code>hop_depth.py</code></div>
+        <h3>A leak, measured instead of assumed</h3>
+        <p>Fixed-size cells still shrink by a fixed amount per hop position. The <code>hop_depth</code> adversary is a structural attacker that quantifies exactly how recoverable that position is, turning a disclosed simplification into a tested number.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">CRYPTO &middot; <code>anontestlab.crypto</code></div>
+        <h3>Crypto-agility as a first-class axis</h3>
+        <p>Six AEAD ciphers across three ECDHE curves, selectable per experiment, for studies that actually compare algorithm choice rather than assuming one.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">NETWORK &middot; <code>relay_process.py</code></div>
+        <h3>WAN realism at two granularities</h3>
+        <p>Per-node heterogeneous conditions layer with directional per-edge conditions, so a relay's link to one peer can differ from its link to another, not just from other relays.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">ADVERSARY &middot; <code>anontestlab.adversary</code></div>
+        <h3>A composable observer pipeline</h3>
+        <p>Observation, Feature, and Decision are separately swappable stages, so a new correlation statistic or classifier drops in without touching how traffic is observed.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">METHOD &middot; README.md</div>
+        <h3>Simplifications are disclosed, not discovered</h3>
+        <p>Every scope trim is stated in the open and, where practical, given its own regression test, so "known limitation" means audited, not unexamined.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="spec">
+  <div class="wrap">
+    <div class="eyebrow">03 &middot; configuration surface</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:28ch;">Every axis is one YAML field away</h2>
+    <div class="spec-cols">
+      <div class="tablewrap">
+        <table>
+          <caption>crypto.algorithm</caption>
+          <thead><tr><th>Cipher</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td class="cellname">none</td><td>plaintext passthrough, isolates transport cost</td></tr>
+            <tr><td class="cellname">aes128gcm</td><td>128-bit key</td></tr>
+            <tr><td class="cellname">aes256gcm</td><td>256-bit key, default</td></tr>
+            <tr><td class="cellname">aes256gcmsiv</td><td>nonce-misuse resistant</td></tr>
+            <tr><td class="cellname">aes256ocb3</td><td>faster construction</td></tr>
+            <tr><td class="cellname">chacha20poly1305</td><td>stream-cipher based</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <caption>crypto.keyexchange</caption>
+          <thead><tr><th>Curve</th><th>Note</th></tr></thead>
+          <tbody>
+            <tr><td class="cellname">x25519</td><td>default, Curve25519</td></tr>
+            <tr><td class="cellname">x448</td><td>RFC 7748, larger keys</td></tr>
+            <tr><td class="cellname">p256</td><td>NIST secp256r1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tablewrap" style="margin-top:40px;">
+      <table>
+        <caption>adversary.types</caption>
+        <thead><tr><th>Adversary</th><th>Model</th><th>Key metric</th></tr></thead>
+        <tbody>
+          <tr><td class="cellname">global_observer</td><td>Observation &rarr; Feature &rarr; Decision, AS-level partial visibility</td><td>auc, tpr_at_fpr</td></tr>
+          <tr><td class="cellname">path_compromise</td><td>independent-compromise Monte Carlo, no packets move</td><td>full_compromise_rate</td></tr>
+          <tr><td class="cellname">watermark</td><td>active delay-pattern injection at hop 1</td><td>watermark_detection_rate</td></tr>
+          <tr><td class="cellname">hop_depth</td><td>structural, quantifies the fixed-size-cell leak</td><td>hop_position_accuracy</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="limitations">
+  <div class="wrap">
+    <div class="eyebrow">04 &middot; methodology</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Disclosed simplifications, not claims</h2>
+    <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
+      A research harness earns trust by stating its scope trims in the open. These
+      are the ones that still stand, each one deliberate:
+    </p>
+    <div class="disclosure">
+      <h3>Known limitations, v0.3</h3>
+      <ul>
+        <li><b>Fixed-size cells still leak hop position.</b> A global observer watching multiple hops of one circuit could infer depth from the size sequence, which is exactly what <code>hop_depth</code> measures.</li>
+        <li><b>Per-edge link conditions are directional-only.</b> Only the connection-initiating side scales by the edge factor; the receiving side's own upstream sends still use its plain per-node value.</li>
+        <li><b>No relay identity or directory system.</b> Keys are ephemeral only: no TOFU question to answer, but also no persistent relay reputation.</li>
+        <li><b><code>bandwidth_weighted</code> routing skips guard/exit-flag constraints.</b> It weights by node capacity alone, deliberately not replicating Tor's position rules.</li>
+        <li><b>Timing varies run to run.</b> The experiment design is reproducible from its seed; real measured latency isn't, because it's real.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <h4>Quickstart</h4>
+        <div class="install">
+<span class="prompt">$</span> pip install -e ".[dev]"
+<span class="prompt">$</span> atl run examples/tor_like.yaml
+<span class="prompt">$</span> atl wizard</div>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/hashtagRR/AnonTestLab">Source on GitHub</a></li>
+          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/README.md">Full documentation</a></li>
+          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/INSTALL.md">Install guide</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>License</h4>
+        <ul>
+          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/LICENSE">GPL-3.0-or-later</a></li>
+          <li><a href="https://github.com/hashtagRR/AnonTestLab/tree/main/examples">Example configs</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>AnonTestLab &middot; maintained by hashtagRR</span>
+      <span>spec revision v0.3</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
