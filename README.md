@@ -36,9 +36,9 @@ and the wire format is custom.
                                     padded to a fixed cell_size) over real
                                     sockets, each hop optionally modeling
                                     WAN latency/jitter/loss/bandwidth
-                                                              │
-                              ┌───────────────────────────────┼───────────────────┐
-                              ▼                                                    ▼
+                                                    │
+                              ┌─────────────────────│────────────────────────────┐
+                              ▼                                                  ▼
                     MetricsCollector                                   Adversary (pluggable)
                     (real measured latency,                            global_observer: Observation
                      delivery, bandwidth)                                 → Feature → Decision, with
@@ -48,7 +48,7 @@ and the wire format is custom.
                                                                          injection + detection
                               │                                                    │
                               └─────────────────────────┬──────────────────────────┘
-                                                          ▼
+                                                        ▼
                                      results/<name>/{configuration.yaml, seed.txt,
                                        metrics.csv, report.md (+ baseline diff if set)}
 ```
