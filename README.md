@@ -221,114 +221,50 @@ multi-path custom config.
 
 ## Crypto
 
-`crypto.algorithm` picks the per-hop AEAD: `none` (plaintext passthrough,
-still real framing/transport, useful for isolating transport cost from
-crypto cost), `aes128gcm`, `aes256gcm`, `aes256gcmsiv` (nonce-misuse
-resistant variant of GCM), `aes256ocb3` (a faster construction), or
-`chacha20poly1305`. `crypto.keyexchange` picks the ECDHE curve for the
-per-hop handshake: `x25519` (default, Curve25519), `x448` (RFC 7748,
-larger keys, higher security margin), or `p256` (NIST secp256r1, for
-interop-focused comparisons). Both are whole-experiment settings, not
-negotiated per hop, since every relay in a circuit has to agree on them;
-the EXTEND cell's public-key field is length-prefixed rather than a
-fixed 32 bytes specifically so the wire format doesn't need to encode
-which curve is in use. A larger handshake key (x448's 56 bytes, p256's
-65-byte uncompressed point, vs x25519's 32) eats more of the fixed-size
-cell padding budget, so a very small `cell_size` combined with a long
-path may need raising to fit. `aes256gcmsiv` needs `cryptography>=42.0`
-(pinned in pyproject.toml) built against OpenSSL 3.2+, which the
-`cryptography` package's own prebuilt wheels satisfy on every common
-platform, so a normal `pip install` doesn't need anything extra.
+`crypto.algorithm` picks the per-hop AEAD:
+
+- `none`: plaintext passthrough, still real framing/transport (isolates transport cost from crypto cost)
+- `aes128gcm`, `aes256gcm`
+- `aes256gcmsiv`: nonce-misuse resistant variant of GCM
+- `aes256ocb3`: a faster construction
+- `chacha20poly1305`
+
+`crypto.keyexchange` picks the ECDHE curve for the per-hop handshake:
+
+- `x25519` (default): Curve25519
+- `x448`: RFC 7748, larger keys, higher security margin
+- `p256`: NIST secp256r1, for interop-focused comparisons
+
+Notes:
+
+- Both are whole-experiment settings, not negotiated per hop: every relay in a circuit must agree on them. The EXTEND cell's public-key field is length-prefixed rather than a fixed 32 bytes, so the wire format doesn't need to encode which curve is in use.
+- A larger handshake key (x448's 56 bytes, p256's 65-byte uncompressed point, vs x25519's 32) eats more of the fixed-size cell padding budget; a very small `cell_size` combined with a long path may need raising.
+- `aes256gcmsiv` needs `cryptography>=42.0` (pinned in pyproject.toml) built against OpenSSL 3.2+. The `cryptography` package's own prebuilt wheels satisfy this on every common platform, so a normal `pip install` needs nothing extra.
 
 ## Testing tools
 
-`atl run <yaml>` runs one experiment and prints one metrics table
-(plus a baseline diff if `baseline:` is set). `atl compare <yaml_a>
-<yaml_b>` runs both and diffs every metric. `atl sweep <yaml>
---param X --values a,b,c` reruns one config varying a single field, one
-CSV row per value. `atl wizard` walks through picking `tor_like` or
-`custom`, filling in parameters, and reviewing the assembled YAML before
-running. `atl dashboard` (needs `pip install -e ".[dashboard]"`)
-starts a local web UI at `http://127.0.0.1:8765`: the same form as the
-wizard, generating the same YAML, with an editable textarea for advanced
-options the form doesn't expose (traffic shaping, link conditions, AS
-groups, watermarking). It's the same `anontestlab.experiment.run_experiment`
-under the hood, just reached over HTTP instead of the CLI.
+- `atl run <yaml>`: runs one experiment, prints one metrics table (plus a baseline diff if `baseline:` is set)
+- `atl compare <yaml_a> <yaml_b>`: runs both, diffs every metric
+- `atl sweep <yaml> --param X --values a,b,c`: reruns one config varying a single field, one CSV row per value
+- `atl wizard`: walks through picking `tor_like` or `custom`, filling in parameters, reviewing the assembled YAML before running
+- `atl dashboard` (needs `pip install -e ".[dashboard]"`): a local web UI at `http://127.0.0.1:8765`: the same form as the wizard, generating the same YAML, plus an editable textarea for advanced options the form doesn't expose (traffic shaping, link conditions, AS groups, watermarking). Same `anontestlab.experiment.run_experiment` under the hood, just reached over HTTP.
 
-Four adversaries are available. `global_observer` composes swappable
-Observation (binning), Feature (`pearson` correlation, pluggable), and
-Decision stages, reporting correlation accuracy, TPR at fixed FPR, AUC,
-precision, and recall. Its visibility can be restricted by path count
-(`observed_paths`) or by AS-group membership (`observed_as`): entry and
-exit are independently visible based on which mock AS group their hop
-belongs to, a more structured partial-observer model than a bare
-fraction. `path_compromise` is an independent-compromise Monte Carlo
-that needs no packets to move at all: if an adversary controls fraction
-*f* of relays, what's the probability a session's path(s) are fully
-compromised (the textbook *f^k*, generalized empirically to multi-path
-sessions), deliberately independent-only with no correlated or
-shared-operator modeling. `watermark` is an active attack: a designated
-relay, always pinned to hop 1, delays every `period`-th real packet by a
-fixed amount, and this adversary checks whether the pattern survives to
-the observed exit timing. It's best used with a single path per session.
-`hop_depth` is structural like `path_compromise` (no packets need to
-move): once fixed-size cell padding is on, it quantifies the disclosed
-hop-position leak directly from `cell_size`/`crypto_algorithm`, reporting
-whether an observer at one hop can recover its exact position from size
-alone (`hop_position_accuracy`, 1.0 once shaping is enabled) and whether
-an observer at hop 1 can tell circuits of different lengths apart from
-size alone (`path_length_leak_at_hop1`, 0.0 by design; `nan` if only one
-circuit length appears in the experiment, since there's nothing to
-distinguish).
+### Adversaries
+
+- **`global_observer`**: composes swappable Observation (binning), Feature (`pearson` correlation, pluggable), and Decision stages, reporting correlation accuracy, TPR at fixed FPR, AUC, precision, and recall. Visibility can be restricted by path count (`observed_paths`) or AS-group membership (`observed_as`): entry and exit are independently visible based on which mock AS group their hop belongs to, a more structured partial-observer model than a bare fraction.
+- **`path_compromise`**: an independent-compromise Monte Carlo that needs no packets to move: if an adversary controls fraction *f* of relays, what's the probability a session's path(s) are fully compromised (the textbook *f^k*, generalized empirically to multi-path sessions). Deliberately independent-only, no correlated or shared-operator modeling.
+- **`watermark`**: an active attack: a designated relay, always pinned to hop 1, delays every `period`-th real packet by a fixed amount, then checks whether the pattern survives to the observed exit timing. Best used with a single path per session.
+- **`hop_depth`**: structural like `path_compromise` (no packets need to move): once fixed-size cell padding is on, quantifies the disclosed hop-position leak directly from `cell_size`/`crypto_algorithm`. Reports whether an observer at one hop can recover its exact position from size alone (`hop_position_accuracy`, 1.0 once shaping is enabled) and whether an observer at hop 1 can tell circuits of different lengths apart from size alone (`path_length_leak_at_hop1`, 0.0 by design; `nan` if only one circuit length appears in the experiment).
 
 ## Known limitations (v0.3)
 
-These are disclosed simplifications, not claims of security properties
-this doesn't have. The return path (delivery confirmations) is
-re-encrypted per hop on the way back, same as the forward data path:
-each relay seals whatever it forwards upstream with its own backward
-key (independent from its forward key, both derived from the same ECDH
-handshake via HKDF with different info strings), and the client peels
-one layer per hop to recover it (see
-`circuit_client.py::unwrap_backward`). Link conditions and timeouts (see
-`wire.PROTOCOL_TIMEOUT_S`) do apply symmetrically to both directions,
-including circuit build, so a lost handshake packet under configured
-`link_loss_probability` surfaces as that one session failing cleanly
-(counted in the `sessions_failed` metric) rather than hanging or
-crashing the whole experiment. Fixed-size cells are exactly `cell_size`
-bytes at hop 1 regardless of path length (padding is computed from the
-path length specifically so this holds), but shrink by a fixed amount
-per hop *position within* a circuit: a single-link observer can't
-distinguish path lengths or real/cover/EXTEND from size alone, but a
-global observer watching multiple hops of the same circuit could infer
-something about hop depth from the size sequence (the `hop_depth`
-adversary measures exactly this). Payloads that don't fit one cell's
-padding budget are fragmented across multiple cells sharing one
-packet_id (`circuit_client.py::Circuit.send`); only the final fragment
-triggers a delivery confirmation, and non-final fragments are marked
-`KIND_REAL_FRAGMENT` so intermediate hops forward them like any other
-cell while the terminal hop knows not to confirm early. WAN link
-conditions can vary per node (`link_conditions.heterogeneous`) or, more
-granularly, per edge (`link_conditions.per_edge`): a relay's send to a
-specific downstream peer gets that edge's own factor rather than the
-relay's flat self value. Per-edge conditions are directional-only,
-though, not a fully symmetric edge model: only the connection-initiating
-side's forward-direction sends are scaled by the edge factor (it always
-knows both endpoints locally); the receiving side's own upstream-facing
-sends on that same connection still use its plain per-node value, since
-telling it the edge factor would need a wire-protocol change this scope
-didn't take on. Keys are
-ephemeral only, with no relay identity/directory system, so there's no
-TOFU question to answer, but also no persistent relay reputation.
-`bandwidth_weighted` routing selects without replacement in proportion
-to each node's configured weight, deliberately not modeling Tor's
-guard/exit-flag position constraints. On determinism: the experiment
-*design* (path choices, traffic
-schedule) is reproducible from the seed, but real measured latency and
-timing will vary run to run like any real system's would, since
-sessions run concurrently over real sockets and each relay subprocess
-has its own independent random state for its own loss/drop/watermark
-rolls.
+Disclosed simplifications, not claims of security properties this doesn't have:
+
+- **Fixed-size cells still leak hop position.** Cells are exactly `cell_size` bytes at hop 1 regardless of path length, but shrink by a fixed amount per hop *position* within a circuit. A single-link observer can't distinguish path lengths or real/cover/EXTEND from size alone, but a global observer watching multiple hops of the same circuit could infer hop depth from the size sequence (the `hop_depth` adversary measures exactly this).
+- **Per-edge link conditions are directional-only.** `link_conditions.per_edge` scales a relay's forward-direction send to a specific peer, not a fully symmetric edge model: only the connection-initiating side is scaled (it always knows both endpoints locally); the receiving side's own upstream-facing sends on that connection still use its plain per-node value, since telling it would need a wire-protocol change this scope didn't take on.
+- **No relay identity or directory system.** Keys are ephemeral only, so there's no TOFU question to answer, but also no persistent relay reputation.
+- **`bandwidth_weighted` routing doesn't model guard/exit-flag constraints.** It selects without replacement in proportion to each node's configured weight, deliberately not replicating Tor's position rules.
+- **Timing varies run to run.** The experiment *design* (path choices, traffic schedule) is reproducible from the seed, but real measured latency and timing will vary like any real system's would, since sessions run concurrently over real sockets and each relay subprocess has its own independent random state for loss/drop/watermark rolls.
 
 ## Extending it
 
