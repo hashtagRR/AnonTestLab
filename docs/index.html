@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AnonTestLab</title>
-<meta name="description" content="An anonymous protocol tester: a real network emulator for testing anonymous communication designs against 432 configurations of crypto, routing, traffic, and adversary models.">
+<title>AnonTestLab: Anonymous Protocol Emulator</title>
+<meta name="description" content="Anonymous Protocol Emulator: a real, circuit-based mix network for testing anonymous communication designs against 432 configurations of crypto, routing, traffic, and adversary models.">
 
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,42 +12,42 @@
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #eef1f6;
+    --bg: #eef0ec;
     --surface: #ffffff;
-    --surface-2: #e5e9f1;
-    --line: #c7d0e0;
-    --text: #10192c;
-    --muted: #55617e;
-    --signal: #0e8a76;
-    --signal-soft: #0e8a761a;
-    --warn: #b3650f;
-    --warn-soft: #b3650f1a;
+    --surface-2: #e2e6e0;
+    --line: #c5ccc3;
+    --text: #0d1730;
+    --muted: #4c5a80;
+    --signal: #00a389;
+    --signal-soft: #00a3891f;
+    --warn: #d9670c;
+    --warn-soft: #d9670c1f;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0b1220;
-      --surface: #121b2e;
-      --surface-2: #0e1626;
-      --line: #263353;
-      --text: #e7ecf7;
-      --muted: #8b96b8;
-      --signal: #4fd8c4;
-      --signal-soft: #4fd8c422;
-      --warn: #f0a860;
-      --warn-soft: #f0a86022;
+      --bg: #0e1210;
+      --surface: #171d1a;
+      --surface-2: #111613;
+      --line: #2e3a34;
+      --text: #eef2fb;
+      --muted: #9baed6;
+      --signal: #16e6c4;
+      --signal-soft: #16e6c426;
+      --warn: #ffab3d;
+      --warn-soft: #ffab3d26;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0b1220;
-    --surface: #121b2e;
-    --surface-2: #0e1626;
-    --line: #263353;
-    --text: #e7ecf7;
-    --muted: #8b96b8;
-    --signal: #4fd8c4;
-    --signal-soft: #4fd8c422;
-    --warn: #f0a860;
-    --warn-soft: #f0a86022;
+    --bg: #0e1210;
+    --surface: #171d1a;
+    --surface-2: #111613;
+    --line: #2e3a34;
+    --text: #eef2fb;
+    --muted: #9baed6;
+    --signal: #16e6c4;
+    --signal-soft: #16e6c426;
+    --warn: #ffab3d;
+    --warn-soft: #ffab3d26;
   }
 
   * { box-sizing: border-box; }
@@ -128,19 +128,19 @@
   .hero h1 .accent { color: var(--signal); }
   .hero p.lede { font-size: 1.12rem; color: var(--muted); max-width: 46ch; margin-top: 20px; }
   .hero-facts { display: flex; gap: 28px; margin-top: 32px; flex-wrap: wrap; }
-  .fact .num { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 2rem; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+  .fact .num { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 2rem; line-height: 1; color: var(--signal); font-variant-numeric: tabular-nums; }
   .fact .label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
 
   .term {
-    background: #0b1220; color: #d8e2f0; border: 1px solid var(--line);
+    background: #0b0f0d; color: #dce4de; border: 1px solid var(--line);
     padding: 20px 22px; font-family: "IBM Plex Mono", monospace; font-size: .82rem;
     overflow-x: auto; white-space: pre;
   }
   .term .head { display: flex; gap: 6px; margin-bottom: 14px; }
-  .term .head span { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #37425c; }
-  .term .dim { color: #6f7ea3; }
-  .term .ok { color: #4fd8c4; }
-  .term .rule { color: #37425c; }
+  .term .head span { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #2a332e; }
+  .term .dim { color: #7c8c82; }
+  .term .ok { color: #16e6c4; }
+  .term .rule { color: #2a332e; }
 
   /* ---------- pipeline ---------- */
   .pipeline { display: flex; flex-direction: column; gap: 0; margin-top: 40px; }
@@ -159,6 +159,35 @@
   .step h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; }
   .step p { color: var(--muted); margin: 0; max-width: 62ch; }
   .step code { color: var(--signal); background: var(--signal-soft); padding: .1em .4em; }
+
+  /* ---------- live circuit diagram ---------- */
+  .circuit-diagram { margin-top: 8px; margin-bottom: 44px; border: 1px solid var(--line); background: var(--surface); padding: 22px 22px 14px; }
+  .circuit-diagram svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .cd-pool-line { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; opacity: .5; }
+  .cd-pool-dot { fill: var(--line); }
+  .cd-path { fill: none; stroke: var(--signal); stroke-width: 2; opacity: .45; }
+  .cd-node { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
+  .cd-node.is-active { stroke: var(--signal); }
+  .cd-node.is-end { stroke: var(--muted); }
+  .cd-label { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--muted); letter-spacing: .02em; }
+  .cd-packet { offset-path: path("M30,112 L272,54 L512,168 L754,54 L972,112"); offset-rotate: 0deg; animation: cd-travel 9s linear infinite; }
+  @keyframes cd-travel { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+  .cd-ring { fill: none; stroke: var(--signal); cx: 0; cy: 0; }
+  .cd-ring1 { r: 13; animation: cd-shed1 9s linear infinite; }
+  .cd-ring2 { r: 9; animation: cd-shed2 9s linear infinite; }
+  .cd-ring3 { r: 5.5; animation: cd-shed3 9s linear infinite; }
+  @keyframes cd-shed1 { 0%, 23% { opacity: .85; } 26%, 100% { opacity: 0; } }
+  @keyframes cd-shed2 { 0%, 48% { opacity: .65; } 51%, 100% { opacity: 0; } }
+  @keyframes cd-shed3 { 0%, 73% { opacity: .5; } 76%, 100% { opacity: 0; } }
+  .cd-core { r: 4; fill: var(--signal); cx: 0; cy: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .cd-packet { animation: none !important; offset-distance: 37%; }
+    .cd-ring1, .cd-ring2 { opacity: .6; }
+    .cd-ring3 { opacity: 0; }
+  }
+  .cd-legend { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .cd-legend span { font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .cd-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
   /* ---------- contributions ---------- */
   .contrib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 40px; }
@@ -226,6 +255,7 @@
   <div class="wrap">
     <div class="brand">AnonTestLab<span class="dot">.</span></div>
     <nav class="nav">
+      <a href="#why">Why</a>
       <a href="#pipeline">Pipeline</a>
       <a href="#contributions">Contributions</a>
       <a href="#spec">Spec</a>
@@ -239,13 +269,13 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <div class="eyebrow">Anonymous protocol tester</div>
-        <h1>Test <span class="accent">432 configurations</span><br>of an anonymous protocol.</h1>
+        <div class="eyebrow">Research tool for anonymous communication networks</div>
+        <h1>Anonymous Protocol<br><span class="accent">Emulator.</span></h1>
         <p class="lede">
-          Every AEAD cipher, ECDHE curve, routing strategy, traffic shape, and
-          adversary model, run against a real onion-routed circuit of genuine OS
-          processes and real sockets. Latency, delivery, and correlation numbers
-          are measured outcomes, not samples from an assumed distribution.
+          A real, circuit-based mix network for testing anonymous communication
+          designs against 432 configurations of crypto, routing, traffic, and
+          adversary models, genuine OS processes and real sockets standing in
+          for the real network, not a discrete-event approximation of one.
         </p>
         <div class="cta-row">
           <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab">View the source</a>
@@ -282,10 +312,100 @@ recall                         1.0000</div>
   </div>
 </section>
 
+<section id="why">
+  <div class="wrap">
+    <div class="eyebrow">01 &middot; why this exists</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:36ch;">A gap between two things that already exist</h2>
+    <p style="color:var(--muted); max-width:68ch; margin-top:14px; font-size:1.02rem;">
+      Most anonymity-network research runs on a discrete-event simulator: fast,
+      but every latency number and every crypto cost is a distribution someone
+      had to assume first. The alternative is running the real Tor codebase,
+      where every cost is real, but instrumenting one adversary experiment
+      means patching production software built for a different job. AnonTestLab
+      sits between them: real relay processes, real sockets, a real ECDHE
+      handshake and AEAD encryption per hop, built from the ground up as a
+      research harness where any single dial, cipher, curve, routing strategy,
+      traffic shape, WAN condition, adversary, is one YAML field, and a full
+      run takes seconds.
+    </p>
+    <p style="color:var(--muted); max-width:68ch; margin-top:18px; font-size:1.02rem;">
+      It's a <b style="color:var(--text);">low-latency, circuit-based mix network</b>:
+      Tor's telescoping onion-routing design, where each relay (a mix node)
+      strips exactly one encryption layer and forwards, rather than the
+      high-latency batch-and-shuffle mixnets built for anonymous email. That's
+      the specific design point every measurement on this page is testing.
+    </p>
+    <div class="contrib-grid" style="margin-top:36px; grid-template-columns: repeat(3, 1fr);">
+      <div class="contrib">
+        <div class="tag">Discrete-event simulator</div>
+        <h3>Fast, but assumed</h3>
+        <p>Latency, handshake cost, and crypto overhead are numbers someone chose. Change the assumption, get a different answer, not a different measurement.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">Running real Tor</div>
+        <h3>Real, but heavyweight</h3>
+        <p>Every cost is genuine, but a new adversary or a swapped cipher means patching production software that was never built to be an experiment harness.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">AnonTestLab</div>
+        <h3>Real, and a research harness</h3>
+        <p>Real relays, real sockets, real crypto cost, and every axis worth studying is a config field, not a fork.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="pipeline">
   <div class="wrap">
-    <div class="eyebrow">01 &middot; how a session actually runs</div>
+    <div class="eyebrow">02 &middot; how a session actually runs</div>
     <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Five real stages, no shortcuts</h2>
+
+    <div class="circuit-diagram">
+      <svg viewBox="0 0 1000 220" role="img" aria-label="Animated diagram of a telescoping onion circuit: a packet travels from the client through three relays to the exit, shedding one encryption layer per hop, while other relays in the addressable pool sit unused.">
+        <line class="cd-pool-line" x1="30" y1="112" x2="150" y2="190"/>
+        <line class="cd-pool-line" x1="30" y1="112" x2="110" y2="35"/>
+        <line class="cd-pool-line" x1="272" y1="54" x2="392" y2="20"/>
+        <line class="cd-pool-line" x1="512" y1="168" x2="632" y2="195"/>
+        <line class="cd-pool-line" x1="754" y1="54" x2="900" y2="25"/>
+        <line class="cd-pool-line" x1="972" y1="112" x2="860" y2="175"/>
+        <circle class="cd-pool-dot" cx="150" cy="190" r="4"/>
+        <circle class="cd-pool-dot" cx="110" cy="35" r="4"/>
+        <circle class="cd-pool-dot" cx="392" cy="20" r="4"/>
+        <circle class="cd-pool-dot" cx="632" cy="195" r="4"/>
+        <circle class="cd-pool-dot" cx="900" cy="25" r="4"/>
+        <circle class="cd-pool-dot" cx="860" cy="175" r="4"/>
+
+        <polyline class="cd-path" points="30,112 272,54 512,168 754,54 972,112"/>
+
+        <circle class="cd-node is-end" cx="30" cy="112" r="12"/>
+        <text class="cd-label" x="30" y="140" text-anchor="middle">CLIENT</text>
+
+        <circle class="cd-node is-active" cx="272" cy="54" r="12"/>
+        <text class="cd-label" x="272" y="30" text-anchor="middle">n2</text>
+
+        <circle class="cd-node is-active" cx="512" cy="168" r="12"/>
+        <text class="cd-label" x="512" y="200" text-anchor="middle">n5</text>
+
+        <circle class="cd-node is-active" cx="754" cy="54" r="12"/>
+        <text class="cd-label" x="754" y="30" text-anchor="middle">n8</text>
+
+        <circle class="cd-node is-end" cx="972" cy="112" r="12"/>
+        <text class="cd-label" x="960" y="140" text-anchor="middle">EXIT</text>
+
+        <g class="cd-packet">
+          <circle class="cd-ring cd-ring1"/>
+          <circle class="cd-ring cd-ring2"/>
+          <circle class="cd-ring cd-ring3"/>
+          <circle class="cd-core"/>
+        </g>
+      </svg>
+      <div class="cd-legend">
+        <span><i style="background:var(--signal)"></i>active circuit (this session's 3 hops)</span>
+        <span><i style="background:var(--line)"></i>other addressable relays, unused this session</span>
+        <span>rings = onion layers, one sheds per hop</span>
+      </div>
+    </div>
+
     <div class="pipeline">
       <div class="step">
         <div class="idx">1</div>
@@ -328,7 +448,7 @@ recall                         1.0000</div>
 
 <section id="contributions">
   <div class="wrap">
-    <div class="eyebrow">02 &middot; what this adds to the domain</div>
+    <div class="eyebrow">03 &middot; what this adds to the domain</div>
     <h2 style="font-size:2rem; font-weight:800; max-width:34ch;">Seven things you can't test on a discrete-event simulator</h2>
     <div class="contrib-grid">
       <div class="contrib">
@@ -372,13 +492,44 @@ recall                         1.0000</div>
 
 <section id="spec">
   <div class="wrap">
-    <div class="eyebrow">03 &middot; configuration surface</div>
+    <div class="eyebrow">04 &middot; configuration surface</div>
     <h2 style="font-size:2rem; font-weight:800; max-width:28ch;">Every axis is one YAML field away</h2>
     <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
       6 AEAD ciphers &times; 3 ECDHE curves &times; 2 routing strategies &times; 3
       traffic distributions &times; 4 adversary models: 432 combinations, each one
       a real config field, not a code change.
     </p>
+
+    <h3 style="font-family:'IBM Plex Mono', monospace; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-top:48px;">Traffic &amp; topology</h3>
+    <div class="contrib-grid" style="margin-top:20px;">
+      <div class="contrib">
+        <div class="tag"><code>traffic.*</code></div>
+        <h3>Traffic distribution</h3>
+        <p><code>real_rate</code> and <code>cover_rate</code>, each drawn from <code>poisson</code> (default), <code>constant</code>, or <code>pareto</code> for bursty, heavy-tailed arrivals. Real traffic is measured; cover traffic is decoy volume.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag"><code>cover_behaviour.*</code></div>
+        <h3>Cover traffic dropping</h3>
+        <p><code>drop_probability</code> lets an intermediate mix node silently discard a fraction of cover cells, modeling a relay that doesn't forward every decoy. Real cells are never dropped this way.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag"><code>routing.*</code></div>
+        <h3>Routing &amp; path splitting</h3>
+        <p><code>routing_strategy</code>: <code>random</code> or <code>bandwidth_weighted</code>. <code>path_length</code> sets hops per path; <code>num_paths</code> and <code>split_strategy</code> (<code>round_robin</code> or <code>random</code>) spread one session across more than one path.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag"><code>traffic_shaping.*</code></div>
+        <h3>Cell shaping</h3>
+        <p><code>cell_size</code> pads every cell to one fixed wire size; <code>mode</code> is <code>variable</code> or <code>fixed_rate</code>, a scheduled send cadence. Oversized payloads fragment across multiple cells automatically.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag"><code>link_conditions.*</code></div>
+        <h3>WAN realism</h3>
+        <p><code>latency_ms</code>, <code>jitter_ms</code>, <code>loss_probability</code>, <code>bandwidth_kbps</code>, plus <code>heterogeneous</code> (per-node variation) and <code>per_edge</code> (per relay-to-peer variation, directional).</p>
+      </div>
+    </div>
+
+    <h3 style="font-family:'IBM Plex Mono', monospace; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-top:48px;">Crypto &amp; adversaries</h3>
     <div class="spec-cols">
       <div class="tablewrap">
         <table>
@@ -423,7 +574,7 @@ recall                         1.0000</div>
 
 <section id="limitations">
   <div class="wrap">
-    <div class="eyebrow">04 &middot; methodology</div>
+    <div class="eyebrow">05 &middot; methodology</div>
     <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Disclosed simplifications, not claims</h2>
     <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
       A research harness earns trust by stating its scope trims in the open. These
