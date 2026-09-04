@@ -282,9 +282,13 @@ distinguish).
 ## Known limitations (v0.3)
 
 These are disclosed simplifications, not claims of security properties
-this doesn't have. The return path (delivery confirmations) isn't
-re-encrypted per hop on the way back, unlike the forward data path's
-proper onion layering. Link conditions and timeouts (see
+this doesn't have. The return path (delivery confirmations) is
+re-encrypted per hop on the way back, same as the forward data path:
+each relay seals whatever it forwards upstream with its own backward
+key (independent from its forward key, both derived from the same ECDH
+handshake via HKDF with different info strings), and the client peels
+one layer per hop to recover it (see
+`circuit_client.py::unwrap_backward`). Link conditions and timeouts (see
 `wire.PROTOCOL_TIMEOUT_S`) do apply symmetrically to both directions,
 including circuit build, so a lost handshake packet under configured
 `link_loss_probability` surfaces as that one session failing cleanly

@@ -1,13 +1,17 @@
 """A single relay (mix node), run as its own OS process.
 
-Generic behavior only: accept a HELLO, derive a per-circuit key via
-ephemeral X25519 + HKDF, then for each RELAY_FWD frame decrypt exactly
-one layer and either act on it (EXTEND the circuit, or terminate a DATA
-cell addressed to this hop) or forward the revealed plaintext downstream
-untouched. Every hop parses cell_type/kind from its own layer (needed so
-an intermediate hop can apply the cover-drop policy), but never sees
-plaintext meant for a later hop or the final application payload unless
-it IS that hop.
+Generic behavior only: accept a HELLO, derive per-circuit forward and
+backward keys via ephemeral ECDHE + HKDF, then for each RELAY_FWD frame
+decrypt exactly one layer and either act on it (EXTEND the circuit, or
+terminate a DATA cell addressed to this hop) or forward the revealed
+plaintext downstream untouched. Every hop parses cell_type/kind from its
+own layer (needed so an intermediate hop can apply the cover-drop
+policy), but never sees plaintext meant for a later hop or the final
+application payload unless it IS that hop. The reverse direction is
+onion-encrypted too: every RELAY_BACK a hop sends upstream (whether it
+originated it or is just relaying one from further downstream) gets
+sealed with that hop's own backward key first, so the client peels one
+layer per hop, symmetric with how the forward direction works.
 """
 from __future__ import annotations
 
@@ -23,7 +27,8 @@ from . import crypto_layer, wire
 
 @dataclass
 class CircuitState:
-    key: bytes
+    key_fwd: bytes
+    key_back: bytes
     upstream_writer: asyncio.StreamWriter
     upstream_cid: bytes
     downstream_writer: asyncio.StreamWriter | None = None
@@ -83,18 +88,23 @@ async def forward_downstream_to_upstream(
     d_reader: asyncio.StreamReader, circuit: CircuitState, state: RelayState
 ) -> None:
     """Relays both EXTENDED confirmations (circuit build) and DELIVERED
-    confirmations (data phase) blindly upstream, subject to this hop's
-    link conditions like every other transmission. Safe to lose one here
-    now that `build_circuit`'s reads have a timeout (see
+    confirmations (data phase) upstream, subject to this hop's link
+    conditions like every other transmission. Re-seals whatever it
+    receives with this hop's own backward key before forwarding (see
+    circuit_client.py::unwrap_backward for how the client peels these
+    layers back off), so the return path is onion-encrypted the same way
+    the forward path is, not forwarded in the clear. Safe to lose one
+    here now that `build_circuit`'s reads have a timeout (see
     `wire.read_frame_timeout`): a lost EXTENDED reply surfaces as a
     clear ProtocolError instead of hanging forever.
     """
     try:
         while True:
             _msg_type, _cid, body = await wire.read_frame(d_reader)
-            if not await apply_link_conditions(state, len(body)):
+            sealed = crypto_layer.seal(state.algorithm, circuit.key_back, body, aad=circuit.upstream_cid)
+            if not await apply_link_conditions(state, len(sealed)):
                 continue  # lost on this hop's upstream link
-            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, body))
+            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed))
             await circuit.upstream_writer.drain()
     except asyncio.IncompleteReadError:
         pass
@@ -109,8 +119,9 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
         circuit.downstream_writer = d_writer
         circuit.downstream_cid = next_circuit_id
         asyncio.create_task(forward_downstream_to_upstream(_d_reader, circuit, state))
-        if await apply_link_conditions(state, len(server_pub)):
-            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, server_pub))
+        sealed_pub = crypto_layer.seal(state.algorithm, circuit.key_back, server_pub, aad=circuit.upstream_cid)
+        if await apply_link_conditions(state, len(sealed_pub)):
+            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed_pub))
             await circuit.upstream_writer.drain()
         return
 
@@ -132,10 +143,11 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
             circuit.downstream_writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit.downstream_cid, inner))
             await circuit.downstream_writer.drain()
         elif kind == wire.KIND_REAL:
-            body = struct.pack(">Q", packet_id)
-            if not await apply_link_conditions(state, len(body)):
+            confirmation = struct.pack(">Q", packet_id)
+            sealed = crypto_layer.seal(state.algorithm, circuit.key_back, confirmation, aad=circuit.upstream_cid)
+            if not await apply_link_conditions(state, len(sealed)):
                 return
-            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, body))
+            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed))
             await circuit.upstream_writer.drain()
         # cover packet at the terminal hop: silently discarded, no confirmation
 
@@ -149,19 +161,21 @@ async def handle_connection(
             return
         client_pub = body
         priv, server_pub = crypto_layer.generate_ephemeral_keypair(state.keyexchange)
-        key = crypto_layer.derive_key(priv, client_pub, state.algorithm, state.keyexchange)
+        key_fwd, key_back = crypto_layer.derive_key(priv, client_pub, state.algorithm, state.keyexchange)
         if await apply_link_conditions(state, len(server_pub)):
             writer.write(wire.pack_frame(wire.MSG_HELLO_REPLY, circuit_id, server_pub))
             await writer.drain()
 
-        circuit = CircuitState(key=key, upstream_writer=writer, upstream_cid=circuit_id)
+        circuit = CircuitState(
+            key_fwd=key_fwd, key_back=key_back, upstream_writer=writer, upstream_cid=circuit_id
+        )
         state.circuits[circuit_id] = circuit
 
         while True:
             msg_type, cid, body = await wire.read_frame(reader)
             if msg_type != wire.MSG_RELAY_FWD:
                 continue
-            plaintext = crypto_layer.open_sealed(state.algorithm, circuit.key, body, aad=cid)
+            plaintext = crypto_layer.open_sealed(state.algorithm, circuit.key_fwd, body, aad=cid)
             await process_relay_fwd(state, circuit, plaintext)
     except asyncio.IncompleteReadError:
         pass

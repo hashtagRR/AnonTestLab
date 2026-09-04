@@ -42,6 +42,27 @@ def wrap_layers(
     return layer
 
 
+def unwrap_backward(
+    keys_in_order: list[bytes], circuit_ids_in_order: list[bytes], sealed: bytes, algorithm: str
+) -> bytes:
+    """Peel the return-path layers a RELAY_BACK message picked up as it
+    traveled from wherever it originated back to the client. Each hop
+    re-seals whatever it forwards upstream with its own backward key
+    (see relay_process.py::forward_downstream_to_upstream), so the hop
+    closest to the client seals last, making its layer the outermost:
+    this peels using keys_in_order/circuit_ids_in_order in the same
+    forward order used to build the circuit (hop 1 first), the mirror of
+    wrap_layers building outermost-to-innermost in reverse order for the
+    forward direction. Pass only the keys established so far (not the
+    full circuit) when unwrapping an EXTENDED reply mid-build, since
+    fewer hops have had a chance to add their own layer at that point.
+    """
+    layer = sealed
+    for key, cid in zip(keys_in_order, circuit_ids_in_order):
+        layer = crypto_layer.open_sealed(algorithm, key, layer, aad=cid)
+    return layer
+
+
 def pad_to_cell_size(target_cell: bytes, cell_size: int, algorithm: str, hops_established: int) -> bytes:
     """Pad `target_cell` (the raw EXTEND or DATA cell for the deepest
     established hop, before any sealing) with random filler so that after
@@ -70,7 +91,8 @@ class Circuit:
     circuit_id: bytes
     reader: asyncio.StreamReader
     writer: asyncio.StreamWriter
-    keys: list[bytes]
+    keys_fwd: list[bytes]
+    keys_back: list[bytes]
     circuit_ids: list[bytes]
     algorithm: str
     path: list[tuple[str, int]]
@@ -82,8 +104,8 @@ class Circuit:
         self._next_id += 1
         target_cell = wire.pack_data(kind, packet_id, payload)
         if self.cell_size is not None:
-            target_cell = pad_to_cell_size(target_cell, self.cell_size, self.algorithm, len(self.keys))
-        sealed = wrap_layers(self.keys, self.circuit_ids, target_cell, self.algorithm, kind, packet_id)
+            target_cell = pad_to_cell_size(target_cell, self.cell_size, self.algorithm, len(self.keys_fwd))
+        sealed = wrap_layers(self.keys_fwd, self.circuit_ids, target_cell, self.algorithm, kind, packet_id)
         self.writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, self.circuit_id, sealed))
         await self.writer.drain()
         return packet_id
@@ -92,7 +114,8 @@ class Circuit:
         msg_type, _cid, body = await wire.read_frame(self.reader)
         if msg_type != wire.MSG_RELAY_BACK:
             raise wire.ProtocolError(f"expected RELAY_BACK, got msg_type={msg_type}")
-        (packet_id,) = struct.unpack(">Q", body)
+        plaintext = unwrap_backward(self.keys_back, self.circuit_ids, body, self.algorithm)
+        (packet_id,) = struct.unpack(">Q", plaintext)
         return packet_id
 
     async def close(self) -> None:
@@ -114,7 +137,9 @@ async def build_circuit(
     msg_type, _cid, body = await wire.read_frame_timeout(reader, "HELLO_REPLY")
     if msg_type != wire.MSG_HELLO_REPLY:
         raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
-    keys = [crypto_layer.derive_key(priv1, body, algorithm, keyexchange)]
+    key_fwd1, key_back1 = crypto_layer.derive_key(priv1, body, algorithm, keyexchange)
+    keys_fwd = [key_fwd1]
+    keys_back = [key_back1]
     circuit_ids = [circuit_id]
 
     for host, port in path[1:]:
@@ -125,21 +150,28 @@ async def build_circuit(
         next_circuit_id = os.urandom(wire.CIRCUIT_ID_LEN)
         plaintext = wire.pack_extend(host, port, pub_i, next_circuit_id)
         if cell_size is not None:
-            plaintext = pad_to_cell_size(plaintext, cell_size, algorithm, len(keys))
-        sealed = wrap_layers(keys, circuit_ids, plaintext, algorithm)
+            plaintext = pad_to_cell_size(plaintext, cell_size, algorithm, len(keys_fwd))
+        sealed = wrap_layers(keys_fwd, circuit_ids, plaintext, algorithm)
         writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit_id, sealed))
         await writer.drain()
-        msg_type, _cid, body = await wire.read_frame_timeout(reader, "RELAY_BACK (EXTENDED reply)")
+        msg_type, _cid, reply_body = await wire.read_frame_timeout(reader, "RELAY_BACK (EXTENDED reply)")
         if msg_type != wire.MSG_RELAY_BACK:
             raise wire.ProtocolError(f"expected RELAY_BACK (EXTENDED reply), got msg_type={msg_type}")
-        keys.append(crypto_layer.derive_key(priv_i, body, algorithm, keyexchange))
+        # Only the hops established so far had a chance to add their own
+        # backward layer to this reply, so unwrap with keys_back as it
+        # stands right now, not the full (not-yet-complete) circuit.
+        server_pub = unwrap_backward(keys_back, circuit_ids, reply_body, algorithm)
+        key_fwd_i, key_back_i = crypto_layer.derive_key(priv_i, server_pub, algorithm, keyexchange)
+        keys_fwd.append(key_fwd_i)
+        keys_back.append(key_back_i)
         circuit_ids.append(next_circuit_id)
 
     return Circuit(
         circuit_id=circuit_id,
         reader=reader,
         writer=writer,
-        keys=keys,
+        keys_fwd=keys_fwd,
+        keys_back=keys_back,
         circuit_ids=circuit_ids,
         algorithm=algorithm,
         path=path,

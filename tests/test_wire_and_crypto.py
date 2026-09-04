@@ -9,7 +9,7 @@ import struct
 import pytest
 
 from anontestlab.emulator import crypto_layer, wire
-from anontestlab.emulator.circuit_client import pad_to_cell_size, wrap_layers
+from anontestlab.emulator.circuit_client import pad_to_cell_size, unwrap_backward, wrap_layers
 
 
 def test_pack_unpack_extend_roundtrip():
@@ -61,21 +61,33 @@ def test_seal_open_roundtrip(algorithm):
 
 
 @pytest.mark.parametrize("keyexchange", ["x25519", "x448", "p256"])
-def test_ecdh_handshake_derives_matching_key(keyexchange):
+def test_ecdh_handshake_derives_matching_keys(keyexchange):
     priv_a, pub_a = crypto_layer.generate_ephemeral_keypair(keyexchange)
     priv_b, pub_b = crypto_layer.generate_ephemeral_keypair(keyexchange)
-    key_a = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm", keyexchange)
-    key_b = crypto_layer.derive_key(priv_b, pub_a, "aes256gcm", keyexchange)
-    assert key_a == key_b
-    assert len(key_a) == 32
+    fwd_a, back_a = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm", keyexchange)
+    fwd_b, back_b = crypto_layer.derive_key(priv_b, pub_a, "aes256gcm", keyexchange)
+    assert fwd_a == fwd_b
+    assert back_a == back_b
+    assert len(fwd_a) == 32
+    assert len(back_a) == 32
+
+
+def test_forward_and_backward_keys_are_independent():
+    """Reusing one key both directions would be a protocol weakness, not
+    just a missed optimization: confirm they're genuinely different."""
+    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
+    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
+    key_fwd, key_back = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm")
+    assert key_fwd != key_back
 
 
 @pytest.mark.parametrize("algorithm,expected_len", [("aes128gcm", 16), ("aes256gcm", 32)])
 def test_derive_key_length_matches_algorithm(algorithm, expected_len):
     priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
     priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
-    key = crypto_layer.derive_key(priv_a, pub_b, algorithm)
-    assert len(key) == expected_len
+    key_fwd, key_back = crypto_layer.derive_key(priv_a, pub_b, algorithm)
+    assert len(key_fwd) == expected_len
+    assert len(key_back) == expected_len
 
 
 def test_mismatched_keyexchange_between_peers_fails_or_mismatches():
@@ -116,6 +128,45 @@ def test_wrap_layers_peels_correctly_through_intermediate_hops():
     assert layer3 == target_cell
     _k3, _pid3, payload3 = wire.unpack_data(layer3)
     assert payload3 == payload
+
+
+def _seal_backward_through_hops(keys_back, cids, content, algorithm="aes256gcm"):
+    """Mirrors relay_process.py::forward_downstream_to_upstream: the
+    deepest hop seals first, then each hop closer to the client re-seals
+    what it relays with its own backward key, so the hop nearest the
+    client ends up outermost."""
+    sealed = content
+    for key, cid in reversed(list(zip(keys_back, cids))):
+        sealed = crypto_layer.seal(algorithm, key, sealed, aad=cid)
+    return sealed
+
+
+def test_backward_layers_peel_correctly_through_intermediate_hops():
+    """The return path mirrors the forward one: a confirmation from the
+    deepest hop gets re-sealed by every hop on the way back, so it's
+    actually encrypted on the wire (not forwarded in the clear), and
+    unwrap_backward must peel it using the keys in forward hop order."""
+    keys_back = [b"0" * 32, b"1" * 32, b"2" * 32]
+    cids = [b"11111111", b"22222222", b"33333333"]
+    confirmation = struct.pack(">Q", 42)
+
+    sealed = _seal_backward_through_hops(keys_back, cids, confirmation)
+    assert sealed != confirmation
+
+    recovered = unwrap_backward(keys_back, cids, sealed, "aes256gcm")
+    assert recovered == confirmation
+
+
+def test_backward_layers_cannot_be_read_with_only_the_deepest_hops_key():
+    """A relay that only knows its own key can't read a confirmation that
+    picked up outer hops' re-encryption on the way back to the client,
+    the same onion property the forward direction already has."""
+    keys_back = [b"0" * 32, b"1" * 32, b"2" * 32]
+    cids = [b"11111111", b"22222222", b"33333333"]
+    sealed = _seal_backward_through_hops(keys_back, cids, struct.pack(">Q", 42))
+
+    with pytest.raises(Exception):
+        crypto_layer.open_sealed("aes256gcm", keys_back[2], sealed, aad=cids[2])
 
 
 def test_wrap_layers_rejects_wrong_hop_local_circuit_id():

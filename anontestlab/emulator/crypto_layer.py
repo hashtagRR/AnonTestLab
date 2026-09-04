@@ -2,8 +2,11 @@
 
 ECDHE per hop (fresh ephemeral keys each circuit build, no long-term
 relay identity, so there's no directory/PKI question to answer for
-v0.1), HKDF-SHA256 to derive a symmetric key, then the chosen AEAD
-(anontestlab.crypto) for both the EXTEND control cells and DATA cells.
+v0.1), HKDF-SHA256 to derive independent forward/backward symmetric keys
+from the same shared secret, then the chosen AEAD (anontestlab.crypto)
+seals both the forward EXTEND/DATA cells and the return-path RELAY_BACK
+confirmations, each hop re-encrypting what it forwards in its own
+direction's key (see circuit_client.py::unwrap_backward).
 
 x25519 (Curve25519) is the default curve; x448 (RFC 7748, larger keys,
 higher security margin) and p256 (NIST secp256r1, for interop-focused
@@ -27,7 +30,8 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from ..crypto import NONCE_LEN, key_length, new_cipher
 
-HKDF_INFO = b"anontestlab-hop-key-v1"
+HKDF_INFO_FWD = b"anontestlab-hop-key-fwd-v1"
+HKDF_INFO_BACK = b"anontestlab-hop-key-back-v1"
 
 # Union[...], not X | Y | Z: this is a real runtime assignment, not an
 # annotation, so it isn't covered by `from __future__ import annotations`
@@ -54,7 +58,13 @@ def generate_ephemeral_keypair(keyexchange: str = "x25519") -> tuple[EphemeralPr
 
 def derive_key(
     priv: EphemeralPrivateKey, peer_pub_bytes: bytes, algorithm: str, keyexchange: str = "x25519"
-) -> bytes:
+) -> tuple[bytes, bytes]:
+    """Returns (key_fwd, key_back): independent keys for the two
+    directions, both derived from the same ECDH shared secret via HKDF
+    with different info strings. Separate directional keys (rather than
+    reusing one key both ways) is standard protocol hygiene, matching how
+    Tor itself derives distinct forward/backward key material from a
+    single handshake."""
     if keyexchange == "x25519":
         shared_secret = priv.exchange(X25519PublicKey.from_public_bytes(peer_pub_bytes))
     elif keyexchange == "x448":
@@ -64,9 +74,14 @@ def derive_key(
         shared_secret = priv.exchange(ec.ECDH(), peer_pub)
     else:
         raise ValueError(f"unknown key exchange '{keyexchange}', available: {KEYEXCHANGES}")
-    return HKDF(
-        algorithm=hashes.SHA256(), length=key_length(algorithm), salt=None, info=HKDF_INFO
-    ).derive(shared_secret)
+    length = key_length(algorithm)
+    key_fwd = HKDF(algorithm=hashes.SHA256(), length=length, salt=None, info=HKDF_INFO_FWD).derive(
+        shared_secret
+    )
+    key_back = HKDF(algorithm=hashes.SHA256(), length=length, salt=None, info=HKDF_INFO_BACK).derive(
+        shared_secret
+    )
+    return key_fwd, key_back
 
 
 def seal(algorithm: str, key: bytes, plaintext: bytes, aad: bytes = b"") -> bytes:
