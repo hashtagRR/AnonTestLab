@@ -10,10 +10,11 @@ msg_type:
   RELAY_BACK  body = opaque bytes, always forwarded upstream verbatim by
               any hop that isn't the originator or the client
 
-Known simplification (v0.1): the circuit_id is constant across the whole
-path rather than re-randomized per hop, and RELAY_BACK bodies aren't
-re-wrapped per hop on the way back. That's a disclosed scope trim, not a
-claim of traffic-analysis resistance.
+circuit_id is hop-local, not shared across the whole path: each EXTEND
+carries the next hop-link's ID, so a link tap can't correlate sessions
+by matching IDs across hops. Known simplification: RELAY_BACK bodies
+aren't re-wrapped per hop on the way back. That's a disclosed scope
+trim, not a claim of traffic-analysis resistance.
 """
 from __future__ import annotations
 
@@ -30,6 +31,14 @@ CIRCUIT_ID_LEN = 8
 PUBKEY_LEN = 32
 NONCE_LEN = 12
 PACK_DATA_HEADER_LEN = 10  # struct ">BBQ": cell_type + kind + packet_id
+MAX_FRAME_LEN = 1 << 20  # 1 MiB — comfortably above any real cell_size, bounds a malformed length field
+
+
+class ProtocolError(Exception):
+    """A peer sent something that doesn't conform to the wire protocol.
+    Distinct from a bug in this codebase (an AssertionError) — this is
+    for untrusted-input validation, which should never be silently
+    disabled by running Python with -O."""
 
 
 def layer_overhead(algorithm: str) -> int:
@@ -49,6 +58,8 @@ def pack_frame(msg_type: int, circuit_id: bytes, body: bytes) -> bytes:
 async def read_frame(reader: asyncio.StreamReader) -> tuple[int, bytes, bytes] | None:
     length_bytes = await reader.readexactly(4)
     (payload_len,) = struct.unpack(">I", length_bytes)
+    if payload_len < 9 or payload_len > MAX_FRAME_LEN:
+        raise ProtocolError(f"frame length {payload_len} outside allowed range (9..{MAX_FRAME_LEN})")
     payload = await reader.readexactly(payload_len)
     msg_type, circuit_id = struct.unpack(">B8s", payload[:9])
     return msg_type, circuit_id, payload[9:]

@@ -18,6 +18,7 @@ class ExperimentResult:
 
 
 def run_experiment(config: ExperimentConfig, out_dir: Path | None = None) -> ExperimentResult:
+    config.validate()
     collector, ctx, avg_build_delay = run_emulated_experiment(config)
 
     metrics = collector.summary()

@@ -160,9 +160,16 @@ class PathSplitter:
 def _fixed_rate_schedule(real_times: list[float], config: ExperimentConfig) -> list[tuple[float, str]]:
     """Constant-output-rate schedule (Loopix-style baseline): a packet
     goes out at every fixed slot regardless of real demand: a real one
-    if any is due, a dummy "cover" one otherwise. Real packets queue if
-    they arrive faster than the fixed rate can drain them; this is
-    deliberately simple, not adaptive.
+    if any is due, a dummy "cover" one otherwise.
+
+    If real demand exceeds the fixed rate's capacity within duration_s,
+    the backlog keeps draining at that *same* fixed rate rather than
+    bursting out immediately, since honoring the rate is the entire
+    point of this mode — bursting would silently break the constant-rate
+    guarantee an experiment is specifically trying to test. This can run
+    the session past duration_s; ExperimentConfig.validate() warns when
+    real_rate looks likely to exceed fixed_rate's capacity so that isn't
+    a silent surprise.
     """
     gap = 1.0 / config.fixed_rate
     pending_real = list(real_times)
@@ -176,11 +183,11 @@ def _fixed_rate_schedule(real_times: list[float], config: ExperimentConfig) -> l
             i += 1
         else:
             events.append((slot, "cover"))
-    # Anything still queued past the last slot is real traffic the fixed
-    # rate couldn't keep up with. Send it anyway, right away, rather
-    # than silently dropping demand the experiment asked for.
-    events += [(t, "real") for t in pending_real[i:]]
-    events.sort(key=lambda e: e[0])
+    slot_index = n_slots
+    while i < len(pending_real):
+        events.append((slot_index * gap, "real"))
+        i += 1
+        slot_index += 1
     return events
 
 

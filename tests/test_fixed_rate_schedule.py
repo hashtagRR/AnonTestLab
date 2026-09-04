@@ -1,5 +1,7 @@
 """Fast pure-Python tests for the fixed-rate traffic schedule. No
 subprocesses/sockets needed."""
+import pytest
+
 from anontestlab.emulator.orchestrator import _fixed_rate_schedule
 from anontestlab.experiment.config import ExperimentConfig
 
@@ -32,11 +34,24 @@ def test_output_rate_is_constant_regardless_of_real_rate():
 
 
 def test_backlog_beyond_last_slot_still_gets_sent():
-    """More real demand than the fixed rate can drain within duration,
-    don't silently drop it, just send it right away past the schedule."""
+    """More real demand than the fixed rate can drain within duration:
+    don't silently drop it, keep draining it after the schedule ends."""
     events = _fixed_rate_schedule([0.99] * 20, _config(fixed_rate=1.0, duration_s=1.0))
     real_count = sum(1 for _t, kind in events if kind == "real")
     assert real_count == 20
+
+
+def test_backlog_keeps_draining_at_the_fixed_rate_not_bursted():
+    """The whole point of fixed_rate mode: overflow must not violate the
+    rate guarantee by bursting out immediately at the original arrival
+    time. It should continue at the same slot spacing instead."""
+    config = _config(fixed_rate=2.0, duration_s=1.0)  # gap = 0.5s
+    events = _fixed_rate_schedule([0.99] * 4, config)
+    real_times = sorted(t for t, kind in events if kind == "real")
+    gaps = [b - a for a, b in zip(real_times, real_times[1:])]
+    assert all(g == pytest.approx(0.5) for g in gaps)
+    # None of the overflow should be bursted at the original 0.99 arrival time.
+    assert real_times[-1] > 1.5
 
 
 def test_events_are_sorted_by_time():

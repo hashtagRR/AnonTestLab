@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
+
+_SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -52,6 +55,15 @@ async def api_run(req: RunRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Invalid experiment YAML: {e}")
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+    if not _SAFE_NAME.match(config.name):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"experiment.name {config.name!r} isn't safe to use as a results directory name "
+                "(it becomes results/<name>/ on disk). Use letters, digits, '.', '_', '-' only."
+            ),
+        )
 
     out_dir = Path("results") / config.name
     try:

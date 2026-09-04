@@ -90,7 +90,8 @@ class Circuit:
 
     async def recv_delivery(self) -> int:
         msg_type, _cid, body = await wire.read_frame(self.reader)
-        assert msg_type == wire.MSG_RELAY_BACK
+        if msg_type != wire.MSG_RELAY_BACK:
+            raise wire.ProtocolError(f"expected RELAY_BACK, got msg_type={msg_type}")
         (packet_id,) = struct.unpack(">Q", body)
         return packet_id
 
@@ -106,7 +107,8 @@ async def build_circuit(path: list[tuple[str, int]], algorithm: str, cell_size: 
     writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, pub1))
     await writer.drain()
     msg_type, _cid, body = await wire.read_frame(reader)
-    assert msg_type == wire.MSG_HELLO_REPLY
+    if msg_type != wire.MSG_HELLO_REPLY:
+        raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
     keys = [crypto_layer.derive_key(priv1, body)]
     circuit_ids = [circuit_id]
 
@@ -123,7 +125,8 @@ async def build_circuit(path: list[tuple[str, int]], algorithm: str, cell_size: 
         writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit_id, sealed))
         await writer.drain()
         msg_type, _cid, body = await wire.read_frame(reader)
-        assert msg_type == wire.MSG_RELAY_BACK
+        if msg_type != wire.MSG_RELAY_BACK:
+            raise wire.ProtocolError(f"expected RELAY_BACK (EXTENDED reply), got msg_type={msg_type}")
         keys.append(crypto_layer.derive_key(priv_i, body))
         circuit_ids.append(next_circuit_id)
 

@@ -69,7 +69,8 @@ async def open_downstream(
     writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, next_client_pub))
     await writer.drain()
     msg_type, _cid, body = await wire.read_frame(reader)
-    assert msg_type == wire.MSG_HELLO_REPLY
+    if msg_type != wire.MSG_HELLO_REPLY:
+        raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
     return reader, writer, body
 
 

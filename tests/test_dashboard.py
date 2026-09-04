@@ -100,3 +100,19 @@ traffic:
     assert data["baseline"]["name"] == "dashboard-baseline"
     assert data["baseline"]["metrics"]["bandwidth_overhead_x"] == 1.0
     assert data["metrics"]["bandwidth_overhead_x"] > 1.0
+
+
+def test_run_rejects_path_traversal_experiment_name():
+    yaml_text = """
+experiment:
+  name: ../../etc/whatever
+  seed: 1
+  duration_s: 1.0
+network:
+  nodes: 4
+sessions:
+  count: 1
+"""
+    resp = client.post("/api/run", json={"yaml_text": yaml_text})
+    assert resp.status_code == 400
+    assert "results directory" in resp.json()["detail"]

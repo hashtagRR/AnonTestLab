@@ -4,6 +4,7 @@ against a bug where an intermediate hop's peeled layer wasn't itself a
 well-formed cell (it needs to be, so an intermediate hop can read
 kind/packet_id to apply cover-drop without understanding the payload)."""
 import asyncio
+import struct
 
 import pytest
 
@@ -192,3 +193,25 @@ def test_fixed_cell_size_shrinks_by_a_fixed_amount_per_hop():
 def test_pad_to_cell_size_rejects_oversized_content():
     with pytest.raises(ValueError):
         pad_to_cell_size(b"x" * 1000, 512, "aes256gcm", 3)
+
+
+def test_read_frame_rejects_oversized_length():
+    async def _run():
+        reader = asyncio.StreamReader()
+        reader.feed_data(struct.pack(">I", wire.MAX_FRAME_LEN + 1))
+        reader.feed_eof()
+        return await wire.read_frame(reader)
+
+    with pytest.raises(wire.ProtocolError):
+        asyncio.run(_run())
+
+
+def test_read_frame_rejects_undersized_length():
+    async def _run():
+        reader = asyncio.StreamReader()
+        reader.feed_data(struct.pack(">I", 3))
+        reader.feed_eof()
+        return await wire.read_frame(reader)
+
+    with pytest.raises(wire.ProtocolError):
+        asyncio.run(_run())

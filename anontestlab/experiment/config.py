@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -84,6 +85,82 @@ class ExperimentConfig:
     def num_paths(self) -> int:
         return 1 + len(self.extra_paths)
 
+    def validate(self) -> None:
+        """Raise ValueError with every problem found, rather than letting
+        a bad value fail confusingly deep in the emulator (or not at
+        all until a division by zero, a relay subprocess exceeding the
+        loopback-subnet limit, etc)."""
+        errors: list[str] = []
+
+        def check(condition: bool, message: str) -> None:
+            if not condition:
+                errors.append(message)
+
+        check(self.duration_s > 0, f"duration_s must be positive, got {self.duration_s}")
+        check(self.num_nodes > 0, f"num_nodes must be positive, got {self.num_nodes}")
+        check(self.num_nodes <= 254, f"num_nodes={self.num_nodes} exceeds the 254-relay loopback-subnet limit")
+        check(self.num_sessions > 0, f"num_sessions must be positive, got {self.num_sessions}")
+        check(self.real_rate >= 0, f"real_rate must be non-negative, got {self.real_rate}")
+        check(self.cover_rate >= 0, f"cover_rate must be non-negative, got {self.cover_rate}")
+        check(
+            0 <= self.cover_drop_probability <= 1,
+            f"cover_drop_probability must be in [0, 1], got {self.cover_drop_probability}",
+        )
+        check(
+            self.traffic_mode in ("variable", "fixed_rate"),
+            f"traffic_mode must be 'variable' or 'fixed_rate', got {self.traffic_mode!r}",
+        )
+        if self.traffic_mode == "fixed_rate":
+            check(self.fixed_rate > 0, f"fixed_rate must be positive, got {self.fixed_rate}")
+            if self.fixed_rate > 0 and self.real_rate >= self.fixed_rate:
+                warnings.warn(
+                    f"real_rate ({self.real_rate}) >= fixed_rate ({self.fixed_rate}): sustained real "
+                    "demand at or above the fixed-rate schedule's capacity means the backlog will "
+                    "keep growing rather than draining, so the session will run well past duration_s. "
+                    "Lower real_rate or raise fixed_rate unless that queue growth is what you're "
+                    "studying.",
+                    stacklevel=2,
+                )
+        if self.cell_size is not None:
+            check(self.cell_size > 0, f"cell_size must be positive, got {self.cell_size}")
+        check(
+            self.crypto_algorithm in ("none", "aes256gcm", "chacha20poly1305"),
+            f"crypto_algorithm must be one of none/aes256gcm/chacha20poly1305, got {self.crypto_algorithm!r}",
+        )
+        check(
+            self.split_strategy in ("round_robin", "random"),
+            f"split_strategy must be 'round_robin' or 'random', got {self.split_strategy!r}",
+        )
+        for i, spec in enumerate(self.paths):
+            if spec.path_length <= 0:
+                errors.append(f"path {i}: path_length must be positive, got {spec.path_length}")
+            elif spec.path_length > self.num_nodes:
+                errors.append(
+                    f"path {i}: path_length={spec.path_length} exceeds num_nodes={self.num_nodes}"
+                )
+        check(self.num_as_groups > 0, f"num_as_groups must be positive, got {self.num_as_groups}")
+        if self.observed_path_count is not None:
+            check(self.observed_path_count > 0, f"observed_path_count must be positive if set, got {self.observed_path_count}")
+        if self.observed_as_count is not None:
+            check(self.observed_as_count > 0, f"observed_as_count must be positive if set, got {self.observed_as_count}")
+        check(
+            0 <= self.compromised_fraction <= 1,
+            f"compromised_fraction must be in [0, 1], got {self.compromised_fraction}",
+        )
+        check(self.compromise_trials >= 0, f"compromise_trials must be non-negative, got {self.compromise_trials}")
+        check(self.watermark_period >= 0, f"watermark_period must be non-negative, got {self.watermark_period}")
+        check(self.link_latency_ms >= 0, f"link_latency_ms must be non-negative, got {self.link_latency_ms}")
+        check(self.link_jitter_ms >= 0, f"link_jitter_ms must be non-negative, got {self.link_jitter_ms}")
+        check(
+            0 <= self.link_loss_probability <= 1,
+            f"link_loss_probability must be in [0, 1], got {self.link_loss_probability}",
+        )
+        if self.link_bandwidth_kbps is not None:
+            check(self.link_bandwidth_kbps > 0, f"link_bandwidth_kbps must be positive if set, got {self.link_bandwidth_kbps}")
+
+        if errors:
+            raise ValueError("invalid experiment config:\n  - " + "\n  - ".join(errors))
+
     @classmethod
     def tor_like(cls, name: str, **overrides) -> "ExperimentConfig":
         base = dict(
@@ -146,7 +223,7 @@ class ExperimentConfig:
         if baseline_path is not None:
             baseline_path = str((Path(path).parent / baseline_path).resolve())
 
-        return cls(
+        config = cls(
             name=exp["name"],
             baseline=baseline_path,
             seed=exp.get("seed", cls.seed),
@@ -188,6 +265,8 @@ class ExperimentConfig:
             link_loss_probability=link_conditions.get("loss_probability", cls.link_loss_probability),
             link_bandwidth_kbps=link_conditions.get("bandwidth_kbps", cls.link_bandwidth_kbps),
         )
+        config.validate()
+        return config
 
     def to_dict(self) -> dict:
         return asdict(self)
