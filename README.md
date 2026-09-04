@@ -22,7 +22,7 @@ and the wire format is custom.
                      Experiment (YAML) ──▶ ExperimentConfig
                                                   │
                               ┌───────────────────┼───────────────────┐
-                              ▼                   ▼                   ▼
+                            ▼                   ▼                   ▼
                     spawn_relays()         RoutingStrategy      TrafficGenerator
                     N real subprocesses,   picks nodes per      real: Poisson/const
                     each 127.0.0.<n>       path (1..N paths)    cover: Poisson/const/fixed_rate
