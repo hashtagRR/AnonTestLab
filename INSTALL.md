@@ -111,27 +111,9 @@ atl dashboard
 
 ## Windows-specific things worth knowing
 
-**Loopback binding.** Each relay node binds its own address in
-`127.0.0.0/8` (`127.0.0.1`, `127.0.0.2`, ...). Windows has treated the
-whole `127.0.0.0/8` range as loopback since Vista, so this should work
-with no extra configuration, unlike macOS, which needs an explicit
-`ifconfig lo0 alias` for anything past `127.0.0.1`. This hasn't been
-verified against a live Windows run as part of this project yet, so if
-you hit it: the symptom would be a `relay nN on port ... did not start
-in time` error from `spawn_relays`, not a silent hang. If you see that,
-it's the first thing to suspect.
-
-**First-run firewall prompt.** The first time you run an experiment,
-Windows Defender Firewall may prompt to allow `python.exe` to accept
-connections on a private network. That's expected: the relay
-subprocesses are real TCP servers on loopback. Allow it; nothing here
-needs to leave your machine (everything binds to `127.0.0.0/8`).
-
-**Antivirus overhead.** Real-time scanning can add noticeable latency to
-spawning many short-lived `python.exe` processes. If experiments with a
-large `network.nodes` count feel slow to start on Windows relative to
-Linux, this is the likely reason. It doesn't affect correctness, only
-wall-clock startup time.
+- **Loopback binding.** Each relay node binds its own address in `127.0.0.0/8` (`127.0.0.1`, `127.0.0.2`, ...). Windows has treated the whole `127.0.0.0/8` range as loopback since Vista, so this should work with no extra configuration, unlike macOS, which needs an explicit `ifconfig lo0 alias` for anything past `127.0.0.1`. This hasn't been verified against a live Windows run as part of this project yet: if you hit it, the symptom would be a `relay nN on port ... did not start in time` error from `spawn_relays`, not a silent hang. If you see that, it's the first thing to suspect.
+- **First-run firewall prompt.** The first time you run an experiment, Windows Defender Firewall may prompt to allow `python.exe` to accept connections on a private network. That's expected: the relay subprocesses are real TCP servers on loopback. Allow it; nothing here needs to leave your machine (everything binds to `127.0.0.0/8`).
+- **Antivirus overhead.** Real-time scanning can add noticeable latency to spawning many short-lived `python.exe` processes. If experiments with a large `network.nodes` count feel slow to start on Windows relative to Linux, this is the likely reason. It doesn't affect correctness, only wall-clock startup time.
 
 ## Troubleshooting checklist
 
