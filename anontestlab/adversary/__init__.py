@@ -2,11 +2,13 @@ from .base import Adversary, AdversaryResult, SessionObservation, SimulationCont
 from .global_observer import GlobalPassiveObserver
 from .path_compromise import PathCompromiseAdversary
 from .watermark import WatermarkAdversary
+from .hop_depth import HopDepthAdversary
 
 ADVERSARIES: dict[str, type[Adversary]] = {
     "global_observer": GlobalPassiveObserver,
     "path_compromise": PathCompromiseAdversary,
     "watermark": WatermarkAdversary,
+    "hop_depth": HopDepthAdversary,
 }
 
 
@@ -27,6 +29,7 @@ __all__ = [
     "GlobalPassiveObserver",
     "PathCompromiseAdversary",
     "WatermarkAdversary",
+    "HopDepthAdversary",
     "ADVERSARIES",
     "get_adversary",
 ]

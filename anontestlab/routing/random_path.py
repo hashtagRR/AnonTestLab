@@ -10,7 +10,13 @@ class RandomPathRouting(RoutingStrategy):
 
     name = "random"
 
-    def select_path(self, node_ids: list[str], rng: random.Random, path_length: int) -> list[str]:
+    def select_path(
+        self,
+        node_ids: list[str],
+        rng: random.Random,
+        path_length: int,
+        weights: dict[str, float] | None = None,
+    ) -> list[str]:
         if path_length > len(node_ids):
             raise ValueError(
                 f"path_length={path_length} exceeds available relays ({len(node_ids)})"

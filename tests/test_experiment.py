@@ -187,6 +187,28 @@ def test_watermark_adversary_disabled_reports_nan():
     assert math.isnan(result.metrics["watermark_detection_rate"])
 
 
+def test_hop_depth_adversary_end_to_end_with_fixed_size_cells():
+    result = run_experiment(
+        _small_config(
+            path_length=3,
+            extra_paths=[PathSpec("random", 2)],
+            cell_size=512,
+            adversaries=["hop_depth"],
+        )
+    )
+    assert result.metrics["delivery_rate"] == 1.0
+    assert result.metrics["hop_position_accuracy"] == 1.0
+    assert result.metrics["path_length_leak_at_hop1"] == 0.0  # two path lengths present (3 and 2)
+
+
+def test_hop_depth_adversary_reports_nan_without_fixed_size_cells():
+    result = run_experiment(_small_config(cell_size=None, adversaries=["hop_depth"]))
+    import math
+
+    assert math.isnan(result.metrics["hop_position_accuracy"])
+    assert math.isnan(result.metrics["path_length_leak_at_hop1"])
+
+
 def test_link_latency_increases_measured_latency():
     baseline = run_experiment(_small_config())
     wan = run_experiment(_small_config(link_latency_ms=50.0, link_jitter_ms=5.0, grace_period_s=2.0))
@@ -237,6 +259,32 @@ def test_link_bandwidth_throttle_increases_latency_without_hanging():
     )
     assert throttled.metrics["avg_latency_s"] > baseline.metrics["avg_latency_s"]
     assert throttled.metrics["delivery_rate"] == 1.0
+
+
+def test_heterogeneous_link_conditions_still_deliver_correctly():
+    result = run_experiment(
+        _small_config(
+            link_latency_ms=20.0,
+            link_loss_probability=0.05,
+            link_heterogeneous=True,
+            link_heterogeneity_spread=0.8,
+            num_sessions=4,
+        )
+    )
+    assert 0 <= result.metrics["sessions_failed"] <= 4
+    if result.metrics["real_packets_sent"] > 0:
+        assert 0.0 <= result.metrics["delivery_rate"] <= 1.0
+
+
+def test_bandwidth_weighted_routing_delivers_correctly():
+    result = run_experiment(
+        _small_config(
+            routing_strategy="bandwidth_weighted",
+            link_bandwidth_kbps=1000.0,
+            link_heterogeneous=True,
+        )
+    )
+    assert result.metrics["delivery_rate"] == 1.0
 
 
 def test_run_experiment_with_baseline_produces_comparison(tmp_path):

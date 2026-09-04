@@ -1,4 +1,4 @@
-"""Fast pure-Python tests for ExperimentConfig.validate() — no
+"""Fast pure-Python tests for ExperimentConfig.validate(), no
 subprocesses/sockets needed."""
 import pytest
 
@@ -46,6 +46,9 @@ def test_default_config_is_valid():
         {"link_jitter_ms": -1},
         {"link_loss_probability": 1.5},
         {"link_bandwidth_kbps": 0},
+        {"link_heterogeneity_spread": 1.0},
+        {"link_heterogeneity_spread": -0.1},
+        {"routing_strategy": "bogus"},
     ],
 )
 def test_invalid_values_are_rejected(overrides):

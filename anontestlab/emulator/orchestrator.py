@@ -45,6 +45,7 @@ class RelayHandle:
     host: str
     port: int
     process: asyncio.subprocess.Process
+    bandwidth_weight: float = 1.0  # relative capacity, for bandwidth-weighted routing
 
 
 MAX_RELAYS_PER_SUBNET = 254  # 127.0.0.1 .. 127.0.0.254
@@ -82,12 +83,20 @@ async def spawn_relays(
     link_jitter_ms: float = 0.0,
     link_loss_probability: float = 0.0,
     link_bandwidth_kbps: float | None = None,
+    link_factors: list[float] | None = None,
 ) -> list[RelayHandle]:
+    """link_factors, if given, is one multiplicative scale per node index
+    (node i's actual latency/jitter/loss/bandwidth = base * link_factors[i]),
+    for a heterogeneous network instead of every relay sharing identical
+    conditions. loss_probability is clamped to [0, 1] since a factor > 1
+    could otherwise push it out of range."""
     handles = []
     for i in range(num_nodes):
         host = _relay_host(i)
         port = _find_free_port(host)
         is_watermark_node = watermark_period > 0 and i == WATERMARK_NODE_INDEX
+        factor = link_factors[i] if link_factors is not None else 1.0
+        node_bandwidth_kbps = (link_bandwidth_kbps * factor) if link_bandwidth_kbps else 0.0
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -105,17 +114,19 @@ async def spawn_relays(
             "--watermark-delay-ms",
             str(watermark_delay_ms if is_watermark_node else 0.0),
             "--link-latency-ms",
-            str(link_latency_ms),
+            str(link_latency_ms * factor),
             "--link-jitter-ms",
-            str(link_jitter_ms),
+            str(link_jitter_ms * factor),
             "--link-loss-probability",
-            str(link_loss_probability),
+            str(min(1.0, link_loss_probability * factor)),
             "--link-bandwidth-kbps",
-            str(link_bandwidth_kbps or 0.0),
+            str(node_bandwidth_kbps),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        handles.append(RelayHandle(node_id=f"n{i}", host=host, port=port, process=process))
+        handles.append(
+            RelayHandle(node_id=f"n{i}", host=host, port=port, process=process, bandwidth_weight=factor)
+        )
 
     for h in handles:
         try:
@@ -166,7 +177,7 @@ def _fixed_rate_schedule(real_times: list[float], config: ExperimentConfig) -> l
     If real demand exceeds the fixed rate's capacity within duration_s,
     the backlog keeps draining at that *same* fixed rate rather than
     bursting out immediately, since honoring the rate is the entire
-    point of this mode — bursting would silently break the constant-rate
+    point of this mode: bursting would silently break the constant-rate
     guarantee an experiment is specifically trying to test. This can run
     the session past duration_s; ExperimentConfig.validate() warns when
     real_rate looks likely to exceed fixed_rate's capacity so that isn't
@@ -284,6 +295,12 @@ async def run_experiment_async(
         if on_progress is not None:
             on_progress({"type": event_type, **fields})
 
+    link_factors = None
+    if config.link_heterogeneous:
+        het_rng = random.Random(config.seed)
+        spread = config.link_heterogeneity_spread
+        link_factors = [het_rng.uniform(1 - spread, 1 + spread) for _ in range(config.num_nodes)]
+
     handles = await spawn_relays(
         config.num_nodes,
         config.crypto_algorithm,
@@ -294,9 +311,11 @@ async def run_experiment_async(
         config.link_jitter_ms,
         config.link_loss_probability,
         config.link_bandwidth_kbps,
+        link_factors,
     )
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
+    node_weights = {h.node_id: h.bandwidth_weight for h in handles}
     emit("relays_ready", num_nodes=len(handles))
 
     try:
@@ -324,7 +343,7 @@ async def run_experiment_async(
             session_rng = random.Random(config.seed * 1_000_003 + session_id + 1)
 
             node_paths = [
-                get_strategy(spec.strategy).select_path(node_ids, session_rng, spec.path_length)
+                get_strategy(spec.strategy).select_path(node_ids, session_rng, spec.path_length, node_weights)
                 for spec in path_specs
             ]
             if config.watermark_period > 0:

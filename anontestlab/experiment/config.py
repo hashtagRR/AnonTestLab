@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from ..routing import STRATEGIES
+
 
 @dataclass
 class PathSpec:
@@ -65,13 +67,17 @@ class ExperimentConfig:
     watermark_period: int = 0
     watermark_delay_ms: float = 30.0
 
-    # WAN realism: applied uniformly to every link in the network (not
-    # per-edge), inside the relay forwarding path via asyncio.sleep. No
-    # tc/netem/namespaces, so it stays fast local iteration.
+    # WAN realism, inside the relay forwarding path via asyncio.sleep. No
+    # tc/netem/namespaces, so it stays fast local iteration. Every node
+    # shares these base values unless link_heterogeneous scales each
+    # node's values by its own factor (still per-node, not truly
+    # per-edge: the same relay behaves identically toward every peer).
     link_latency_ms: float = 0.0
     link_jitter_ms: float = 0.0
     link_loss_probability: float = 0.0
     link_bandwidth_kbps: float | None = None
+    link_heterogeneous: bool = False
+    link_heterogeneity_spread: float = 0.5  # each node's factor ~ Uniform(1-spread, 1+spread)
 
     observer_bin_width_ms: float = 50.0
     observer_classifier: str = "pearson"
@@ -131,6 +137,11 @@ class ExperimentConfig:
             self.split_strategy in ("round_robin", "random"),
             f"split_strategy must be 'round_robin' or 'random', got {self.split_strategy!r}",
         )
+        for spec in self.paths:
+            check(
+                spec.strategy in STRATEGIES,
+                f"routing strategy {spec.strategy!r} unknown, available: {sorted(STRATEGIES)}",
+            )
         for i, spec in enumerate(self.paths):
             if spec.path_length <= 0:
                 errors.append(f"path {i}: path_length must be positive, got {spec.path_length}")
@@ -157,6 +168,10 @@ class ExperimentConfig:
         )
         if self.link_bandwidth_kbps is not None:
             check(self.link_bandwidth_kbps > 0, f"link_bandwidth_kbps must be positive if set, got {self.link_bandwidth_kbps}")
+        check(
+            0 <= self.link_heterogeneity_spread < 1,
+            f"link_heterogeneity_spread must be in [0, 1), got {self.link_heterogeneity_spread}",
+        )
 
         if errors:
             raise ValueError("invalid experiment config:\n  - " + "\n  - ".join(errors))
@@ -264,6 +279,10 @@ class ExperimentConfig:
             link_jitter_ms=link_conditions.get("jitter_ms", cls.link_jitter_ms),
             link_loss_probability=link_conditions.get("loss_probability", cls.link_loss_probability),
             link_bandwidth_kbps=link_conditions.get("bandwidth_kbps", cls.link_bandwidth_kbps),
+            link_heterogeneous=link_conditions.get("heterogeneous", cls.link_heterogeneous),
+            link_heterogeneity_spread=link_conditions.get(
+                "heterogeneity_spread", cls.link_heterogeneity_spread
+            ),
         )
         config.validate()
         return config

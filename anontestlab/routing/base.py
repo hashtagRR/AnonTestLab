@@ -16,5 +16,14 @@ class RoutingStrategy(ABC):
     name: str = "base"
 
     @abstractmethod
-    def select_path(self, node_ids: list[str], rng: random.Random, path_length: int) -> list[str]:
-        ...
+    def select_path(
+        self,
+        node_ids: list[str],
+        rng: random.Random,
+        path_length: int,
+        weights: dict[str, float] | None = None,
+    ) -> list[str]:
+        """weights, if given, maps node_id to a relative selection weight
+        (e.g. bandwidth capacity). Strategies that don't use weighting
+        (like uniform random) ignore it; it's always passed so the caller
+        doesn't need to know which strategies care."""

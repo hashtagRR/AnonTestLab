@@ -24,8 +24,8 @@ and the wire format is custom.
                               ┌───────────────────┼───────────────────┐
                               ▼                   ▼                   ▼
                     spawn_relays()         RoutingStrategy      TrafficGenerator
-                    N real subprocesses,   picks nodes per      real: Poisson/const
-                    each 127.0.0.<n>       path (1..N paths)    cover: Poisson/const/fixed_rate
+                    N real subprocesses,   picks nodes per      real: Poisson/const/pareto
+                    each 127.0.0.<n>       path (1..N paths)    cover: Poisson/const/pareto/fixed_rate
                               │                   │                   │
                               └───────────────────│───────────────────┘
                                                   ▼
@@ -76,11 +76,13 @@ dimension below configurable.
       random selection,             network.nodes, as_groups
       no cover, no split                        │
                                                  ▼
-                                     routing.paths (1..N paths, each its
-                                     own strategy + path_length), split_strategy
+                                     routing.paths (1..N paths, each its own
+                                     strategy: random | bandwidth_weighted, +
+                                     path_length), split_strategy
                                                  │
                                                  ▼
                                      traffic.real_rate, cover_rate,
+                                     distribution: poisson | constant | pareto,
                                      cover_behaviour.drop_probability
                                                  │
                                                  ▼
@@ -92,8 +94,9 @@ dimension below configurable.
                                      crypto.algorithm
                                                  │
                                                  ▼
-                                     link_conditions: latency, jitter,
-                                     loss, bandwidth (WAN realism)
+                                     link_conditions: latency, jitter, loss,
+                                     bandwidth (WAN realism), heterogeneous
+                                     (per-node variation instead of uniform)
                                                  │
                                                  ▼
                                      adversary.types + per-type params
@@ -168,13 +171,14 @@ sessions:
 
 routing:
   paths:
-    - strategy: random
+    - strategy: bandwidth_weighted   # or "random"
       path_length: 3
     - strategy: random
       path_length: 4
   split_strategy: round_robin   # or "random"
 
 traffic:
+  distribution: pareto            # "poisson" (default) | "constant" | "pareto" (bursty)
   real_rate: 6
   cover_rate: 0                  # >0 to enable cover traffic
 
@@ -190,6 +194,8 @@ link_conditions:                   # WAN realism, applied per-hop via asyncio.sl
   jitter_ms: 10
   loss_probability: 0.02
   bandwidth_kbps: 512
+  heterogeneous: true              # vary these per node instead of uniform
+  heterogeneity_spread: 0.5         # each node's factor ~ Uniform(1-spread, 1+spread)
 
 crypto:
   algorithm: chacha20poly1305   # "none" | "aes256gcm" | "chacha20poly1305"
@@ -224,7 +230,7 @@ options the form doesn't expose (traffic shaping, link conditions, AS
 groups, watermarking). It's the same `anontestlab.experiment.run_experiment`
 under the hood, just reached over HTTP instead of the CLI.
 
-Three adversaries are available. `global_observer` composes swappable
+Four adversaries are available. `global_observer` composes swappable
 Observation (binning), Feature (`pearson` correlation, pluggable), and
 Decision stages, reporting correlation accuracy, TPR at fixed FPR, AUC,
 precision, and recall. Its visibility can be restricted by path count
@@ -240,6 +246,15 @@ shared-operator modeling. `watermark` is an active attack: a designated
 relay, always pinned to hop 1, delays every `period`-th real packet by a
 fixed amount, and this adversary checks whether the pattern survives to
 the observed exit timing. It's best used with a single path per session.
+`hop_depth` is structural like `path_compromise` (no packets need to
+move): once fixed-size cell padding is on, it quantifies the disclosed
+hop-position leak directly from `cell_size`/`crypto_algorithm`, reporting
+whether an observer at one hop can recover its exact position from size
+alone (`hop_position_accuracy`, 1.0 once shaping is enabled) and whether
+an observer at hop 1 can tell circuits of different lengths apart from
+size alone (`path_length_leak_at_hop1`, 0.0 by design; `nan` if only one
+circuit length appears in the experiment, since there's nothing to
+distinguish).
 
 ## Known limitations (v0.2)
 
@@ -257,15 +272,18 @@ path length specifically so this holds), but shrink by a fixed amount
 per hop *position within* a circuit: a single-link observer can't
 distinguish path lengths or real/cover/EXTEND from size alone, but a
 global observer watching multiple hops of the same circuit could infer
-something about hop depth from the size sequence. No fragmentation for
-payloads that don't fit the padding budget (a clear error instead). WAN
-link conditions are uniform across every link in the network, not
-per-edge, so there's no heterogeneous topology modeling. Keys are
+something about hop depth from the size sequence (the `hop_depth`
+adversary measures exactly this). No fragmentation for payloads that
+don't fit the padding budget (a clear error instead). WAN link
+conditions can vary per node (`link_conditions.heterogeneous`), but
+still not truly per-edge: a relay behaves identically toward every peer
+it talks to, rather than having a different profile per link. Keys are
 ephemeral only, with no relay identity/directory system, so there's no
-TOFU question to answer, but also no persistent relay reputation. Only
-one path-selection strategy exists (uniform random); the interesting
-axis here is path *count* and splitting, not selection sophistication.
-On determinism: the experiment *design* (path choices, traffic
+TOFU question to answer, but also no persistent relay reputation.
+`bandwidth_weighted` routing selects without replacement in proportion
+to each node's configured weight, deliberately not modeling Tor's
+guard/exit-flag position constraints. On determinism: the experiment
+*design* (path choices, traffic
 schedule) is reproducible from the seed, but real measured latency and
 timing will vary run to run like any real system's would, since
 sessions run concurrently over real sockets and each relay subprocess
