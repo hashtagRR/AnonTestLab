@@ -16,6 +16,7 @@ pubkey field for how the wire format stays curve-agnostic).
 from __future__ import annotations
 
 import os
+from typing import Union
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -28,7 +29,11 @@ from ..crypto import NONCE_LEN, key_length, new_cipher
 
 HKDF_INFO = b"anontestlab-hop-key-v1"
 
-EphemeralPrivateKey = X25519PrivateKey | X448PrivateKey | ec.EllipticCurvePrivateKey
+# Union[...], not X | Y | Z: this is a real runtime assignment, not an
+# annotation, so it isn't covered by `from __future__ import annotations`
+# and must work on the project's Python 3.9 floor, where the `|` union
+# operator between type objects doesn't exist yet (added in 3.10).
+EphemeralPrivateKey = Union[X25519PrivateKey, X448PrivateKey, ec.EllipticCurvePrivateKey]
 
 KEYEXCHANGES = ("x25519", "x448", "p256")
 

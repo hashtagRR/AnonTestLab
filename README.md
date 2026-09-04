@@ -233,7 +233,10 @@ fixed 32 bytes specifically so the wire format doesn't need to encode
 which curve is in use. A larger handshake key (x448's 56 bytes, p256's
 65-byte uncompressed point, vs x25519's 32) eats more of the fixed-size
 cell padding budget, so a very small `cell_size` combined with a long
-path may need raising to fit.
+path may need raising to fit. `aes256gcmsiv` needs `cryptography>=42.0`
+(pinned in pyproject.toml) built against OpenSSL 3.2+, which the
+`cryptography` package's own prebuilt wheels satisfy on every common
+platform, so a normal `pip install` doesn't need anything extra.
 
 ## Testing tools
 
@@ -315,7 +318,14 @@ rolls.
 Routing strategies, traffic generators, and adversaries are small
 classes registered in a lookup dict (`anontestlab.routing.STRATEGIES`,
 `anontestlab.traffic.GENERATORS`, `anontestlab.adversary.ADVERSARIES`). Add one
-by subclassing the relevant base class and registering it.
+by subclassing the relevant base class and registering it. The crypto
+layer follows the same pattern but isn't class-based: AEAD ciphers are
+registered in `anontestlab.crypto.ALGORITHMS` (plus a matching entry in
+`KEY_LENGTHS`), and handshake curves are a fixed if/elif in
+`anontestlab.emulator.crypto_layer.generate_ephemeral_keypair`/`derive_key`
+rather than a dict, since each curve's key-generation and ECDH calls
+have a genuinely different shape (see `KEYEXCHANGES` for the current
+set).
 
 ## License
 
