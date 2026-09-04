@@ -16,6 +16,7 @@ import random
 import socket
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -277,7 +278,12 @@ async def run_session(
 
 async def run_experiment_async(
     config: ExperimentConfig,
+    on_progress: Callable[[dict], None] | None = None,
 ) -> tuple[MetricsCollector, SimulationContext, float, int]:
+    def emit(event_type: str, **fields) -> None:
+        if on_progress is not None:
+            on_progress({"type": event_type, **fields})
+
     handles = await spawn_relays(
         config.num_nodes,
         config.crypto_algorithm,
@@ -291,6 +297,7 @@ async def run_experiment_async(
     )
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
+    emit("relays_ready", num_nodes=len(handles))
 
     try:
         collector = MetricsCollector()
@@ -298,6 +305,7 @@ async def run_experiment_async(
         session_paths: dict[int, list[list[str]]] = {}
         build_delays: list[float] = []
         sessions_failed = 0
+        sessions_completed = 0
 
         path_specs = config.paths
         splitter = PathSplitter(config.split_strategy, len(path_specs))
@@ -348,10 +356,10 @@ async def run_experiment_async(
             # A lost handshake packet (under configured link_loss_probability)
             # surfaces here as a ProtocolError (see wire.read_frame_timeout) or
             # a connection-level failure. That's realistic behavior worth
-            # seeing, not a bug — but it must fail only *this* session, not
+            # seeing, not a bug, but it must fail only *this* session, not
             # take down the whole experiment. session_paths above is already
             # recorded regardless, so path_compromise is unaffected.
-            nonlocal sessions_failed
+            nonlocal sessions_failed, sessions_completed
             try:
                 packets, obs, build_delay = await run_session(
                     session_id,
@@ -363,15 +371,36 @@ async def run_experiment_async(
                     observed_exit_indices,
                     experiment_start,
                 )
-            except (wire.ProtocolError, OSError, ConnectionError):
+            except (wire.ProtocolError, OSError, ConnectionError) as e:
                 sessions_failed += 1
+                sessions_completed += 1
+                emit(
+                    "session_failed",
+                    session_id=session_id,
+                    completed=sessions_completed,
+                    total=config.num_sessions,
+                    error=str(e),
+                )
                 return
             for p in packets:
                 collector.record(p)
             observations[session_id] = obs
             build_delays.append(build_delay)
+            sessions_completed += 1
+            real_sent = sum(1 for p in packets if p.kind == "real")
+            real_delivered = sum(1 for p in packets if p.kind == "real" and p.delivered)
+            emit(
+                "session_complete",
+                session_id=session_id,
+                completed=sessions_completed,
+                total=config.num_sessions,
+                real_sent=real_sent,
+                real_delivered=real_delivered,
+                build_delay_s=build_delay,
+            )
 
         await asyncio.gather(*[run_one(sid) for sid in range(config.num_sessions)])
+        emit("experiment_complete", sessions_failed=sessions_failed, total=config.num_sessions)
 
         ctx = SimulationContext(sessions=observations, session_paths=session_paths, node_ids=node_ids)
         avg_build_delay = sum(build_delays) / len(build_delays) if build_delays else 0.0
@@ -380,5 +409,7 @@ async def run_experiment_async(
         await terminate_relays(handles)
 
 
-def run_experiment(config: ExperimentConfig) -> tuple[MetricsCollector, SimulationContext, float, int]:
-    return asyncio.run(run_experiment_async(config))
+def run_experiment(
+    config: ExperimentConfig, on_progress: Callable[[dict], None] | None = None
+) -> tuple[MetricsCollector, SimulationContext, float, int]:
+    return asyncio.run(run_experiment_async(config, on_progress))

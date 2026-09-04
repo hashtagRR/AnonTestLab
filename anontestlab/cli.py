@@ -16,6 +16,22 @@ def _print_metrics(title: str, metrics: dict[str, float]) -> None:
         print(f"{k:30s} {v_str}")
 
 
+def _print_progress(event: dict) -> None:
+    t = event["type"]
+    if t == "relays_ready":
+        print(f"  {event['num_nodes']} relays ready")
+    elif t == "session_complete":
+        build_ms = event["build_delay_s"] * 1000
+        print(
+            f"  session {event['completed']}/{event['total']} complete "
+            f"({event['real_delivered']}/{event['real_sent']} real delivered, build {build_ms:.0f}ms)"
+        )
+    elif t == "session_failed":
+        print(f"  session {event['completed']}/{event['total']} FAILED: {event['error']}")
+    elif t == "experiment_complete" and event["sessions_failed"]:
+        print(f"  {event['sessions_failed']}/{event['total']} session(s) failed")
+
+
 def _parse_value(raw: str):
     for caster in (int, float):
         try:
@@ -54,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         config = ExperimentConfig.from_yaml(args.experiment_yaml)
         out_dir = Path(args.out) if args.out else Path("results") / config.name
-        result = run_experiment(config, out_dir=out_dir)
+        print(f"Running {config.name}...")
+        result = run_experiment(config, out_dir=out_dir, on_progress=_print_progress)
         _print_metrics(config.name, result.metrics)
         if result.baseline_result is not None:
             print(f"\nBaseline comparison ({result.baseline_result.config.name})")
@@ -97,7 +114,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "wizard":
         config = run_wizard()
         out_dir = Path("results") / config.name
-        result = run_experiment(config, out_dir=out_dir)
+        print(f"\nRunning {config.name}...")
+        result = run_experiment(config, out_dir=out_dir, on_progress=_print_progress)
         _print_metrics(config.name, result.metrics)
         print(f"\nWritten to {out_dir}/")
         return 0

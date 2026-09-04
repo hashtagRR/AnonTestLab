@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,9 +18,13 @@ class ExperimentResult:
     baseline_result: "ExperimentResult | None" = None
 
 
-def run_experiment(config: ExperimentConfig, out_dir: Path | None = None) -> ExperimentResult:
+def run_experiment(
+    config: ExperimentConfig,
+    out_dir: Path | None = None,
+    on_progress: Callable[[dict], None] | None = None,
+) -> ExperimentResult:
     config.validate()
-    collector, ctx, avg_build_delay, sessions_failed = run_emulated_experiment(config)
+    collector, ctx, avg_build_delay, sessions_failed = run_emulated_experiment(config, on_progress)
 
     metrics = collector.summary()
     metrics["circuit_build_delay_s"] = avg_build_delay
