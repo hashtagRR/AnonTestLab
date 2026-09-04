@@ -277,7 +277,7 @@ async def run_session(
 
 async def run_experiment_async(
     config: ExperimentConfig,
-) -> tuple[MetricsCollector, SimulationContext, float]:
+) -> tuple[MetricsCollector, SimulationContext, float, int]:
     handles = await spawn_relays(
         config.num_nodes,
         config.crypto_algorithm,
@@ -297,6 +297,7 @@ async def run_experiment_async(
         observations: dict[int, SessionObservation] = {}
         session_paths: dict[int, list[list[str]]] = {}
         build_delays: list[float] = []
+        sessions_failed = 0
 
         path_specs = config.paths
         splitter = PathSplitter(config.split_strategy, len(path_specs))
@@ -344,16 +345,27 @@ async def run_experiment_async(
                     session_rng.sample(range(len(path_specs)), min(k, len(path_specs)))
                 )
 
-            packets, obs, build_delay = await run_session(
-                session_id,
-                addr_paths,
-                config,
-                session_rng,
-                splitter,
-                observed_entry_indices,
-                observed_exit_indices,
-                experiment_start,
-            )
+            # A lost handshake packet (under configured link_loss_probability)
+            # surfaces here as a ProtocolError (see wire.read_frame_timeout) or
+            # a connection-level failure. That's realistic behavior worth
+            # seeing, not a bug — but it must fail only *this* session, not
+            # take down the whole experiment. session_paths above is already
+            # recorded regardless, so path_compromise is unaffected.
+            nonlocal sessions_failed
+            try:
+                packets, obs, build_delay = await run_session(
+                    session_id,
+                    addr_paths,
+                    config,
+                    session_rng,
+                    splitter,
+                    observed_entry_indices,
+                    observed_exit_indices,
+                    experiment_start,
+                )
+            except (wire.ProtocolError, OSError, ConnectionError):
+                sessions_failed += 1
+                return
             for p in packets:
                 collector.record(p)
             observations[session_id] = obs
@@ -363,10 +375,10 @@ async def run_experiment_async(
 
         ctx = SimulationContext(sessions=observations, session_paths=session_paths, node_ids=node_ids)
         avg_build_delay = sum(build_delays) / len(build_delays) if build_delays else 0.0
-        return collector, ctx, avg_build_delay
+        return collector, ctx, avg_build_delay, sessions_failed
     finally:
         await terminate_relays(handles)
 
 
-def run_experiment(config: ExperimentConfig) -> tuple[MetricsCollector, SimulationContext, float]:
+def run_experiment(config: ExperimentConfig) -> tuple[MetricsCollector, SimulationContext, float, int]:
     return asyncio.run(run_experiment_async(config))

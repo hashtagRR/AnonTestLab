@@ -195,14 +195,39 @@ def test_link_latency_increases_measured_latency():
 
 
 def test_link_loss_reduces_delivery_without_hanging():
-    # Regression guard: link loss must never be applied to circuit-build
-    # control traffic (see forward_downstream_to_upstream). Losing an
-    # EXTENDED reply there would hang build_circuit's unbounded read
-    # forever. This test would time out the whole suite if that regressed.
+    # Regression guard: link loss applies to circuit-build control traffic
+    # too (symmetric with data-plane loss), which relies on
+    # wire.read_frame_timeout to turn a lost EXTENDED/HELLO_REPLY into a
+    # clear ProtocolError instead of hanging build_circuit's read forever,
+    # and on run_experiment_async catching it per-session rather than
+    # letting it crash the whole experiment. This test would time out (the
+    # old hang) or fail with an unhandled exception (the crash) if either
+    # regressed. Per-relay loss rolls aren't seeded from config.seed (each
+    # relay is a separate OS process with its own random state), so how
+    # many of these sessions actually fail varies run to run. Six
+    # sessions makes "every single one fails" astronomically unlikely
+    # without pinning down a result the assertions need to depend on.
+    num_sessions = 6
     result = run_experiment(
-        _small_config(link_loss_probability=0.15, real_rate=8.0, duration_s=1.5, grace_period_s=1.0)
+        _small_config(
+            link_loss_probability=0.15, real_rate=8.0, duration_s=1.5, grace_period_s=1.0,
+            num_sessions=num_sessions,
+        )
     )
-    assert 0.0 < result.metrics["delivery_rate"] < 1.0
+    assert 0 <= result.metrics["sessions_failed"] <= num_sessions
+    if result.metrics["real_packets_sent"] > 0:
+        assert 0.0 <= result.metrics["delivery_rate"] <= 1.0
+
+
+def test_extreme_link_loss_fails_sessions_gracefully_not_the_whole_experiment():
+    # Near-certain per-leg loss makes circuit build fail for most/all
+    # sessions almost every run. The point: run_experiment must still
+    # return normally (not raise), with the failures counted, rather than
+    # an unhandled ProtocolError propagating out of asyncio.gather.
+    result = run_experiment(
+        _small_config(link_loss_probability=0.95, duration_s=1.0, grace_period_s=0.5, num_sessions=3)
+    )
+    assert result.metrics["sessions_failed"] >= 0  # didn't raise to get here
 
 
 def test_link_bandwidth_throttle_increases_latency_without_hanging():

@@ -229,24 +229,32 @@ the observed exit timing. It's best used with a single path per session.
 
 These are disclosed simplifications, not claims of security properties
 this doesn't have. The return path (delivery confirmations) isn't
-re-encrypted per hop on the way back, and isn't subject to link
-conditions either, since an unbounded read in circuit-build has no
-retry (see the note in
-`emulator/relay_process.py::forward_downstream_to_upstream`). Fixed-size
-cells still shrink by a fixed amount per hop when enabled: it's the same
-size at the same hop *position* for every circuit of that length, not
-truly hop-invariant like Tor's non-expanding CTR construction, and
-there's no fragmentation for payloads that don't fit the padding budget
-(a clear error instead). WAN link conditions are uniform across every
-link in the network, not per-edge, so there's no heterogeneous topology
-modeling. Keys are ephemeral only, with no relay identity/directory
-system, so there's no TOFU question to answer, but also no persistent
-relay reputation. Only one path-selection strategy exists (uniform
-random); the interesting axis here is path *count* and splitting, not
-selection sophistication. On determinism: the experiment *design* (path
-choices, traffic schedule) is reproducible from the seed, but real
-measured latency and timing will vary run to run like any real system's
-would, since sessions run concurrently over real sockets.
+re-encrypted per hop on the way back, unlike the forward data path's
+proper onion layering. Link conditions and timeouts (see
+`wire.PROTOCOL_TIMEOUT_S`) do apply symmetrically to both directions,
+including circuit build, so a lost handshake packet under configured
+`link_loss_probability` surfaces as that one session failing cleanly
+(counted in the `sessions_failed` metric) rather than hanging or
+crashing the whole experiment. Fixed-size cells are exactly `cell_size`
+bytes at hop 1 regardless of path length (padding is computed from the
+path length specifically so this holds), but shrink by a fixed amount
+per hop *position within* a circuit: a single-link observer can't
+distinguish path lengths or real/cover/EXTEND from size alone, but a
+global observer watching multiple hops of the same circuit could infer
+something about hop depth from the size sequence. No fragmentation for
+payloads that don't fit the padding budget (a clear error instead). WAN
+link conditions are uniform across every link in the network, not
+per-edge, so there's no heterogeneous topology modeling. Keys are
+ephemeral only, with no relay identity/directory system, so there's no
+TOFU question to answer, but also no persistent relay reputation. Only
+one path-selection strategy exists (uniform random); the interesting
+axis here is path *count* and splitting, not selection sophistication.
+On determinism: the experiment *design* (path choices, traffic
+schedule) is reproducible from the seed, but real measured latency and
+timing will vary run to run like any real system's would, since
+sessions run concurrently over real sockets and each relay subprocess
+has its own independent random state for its own loss/drop/watermark
+rolls.
 
 ## Extending it
 

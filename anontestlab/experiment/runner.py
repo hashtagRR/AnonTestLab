@@ -19,10 +19,11 @@ class ExperimentResult:
 
 def run_experiment(config: ExperimentConfig, out_dir: Path | None = None) -> ExperimentResult:
     config.validate()
-    collector, ctx, avg_build_delay = run_emulated_experiment(config)
+    collector, ctx, avg_build_delay, sessions_failed = run_emulated_experiment(config)
 
     metrics = collector.summary()
     metrics["circuit_build_delay_s"] = avg_build_delay
+    metrics["sessions_failed"] = sessions_failed
 
     rng = random.Random(config.seed)
     for adversary_name in config.adversaries:

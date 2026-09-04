@@ -63,12 +63,16 @@ async def apply_link_conditions(state: RelayState, nbytes: int) -> bool:
 
 
 async def open_downstream(
-    host: str, port: int, circuit_id: bytes, next_client_pub: bytes
+    host: str, port: int, circuit_id: bytes, next_client_pub: bytes, state: RelayState
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, bytes]:
     reader, writer = await asyncio.open_connection(host, port)
-    writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, next_client_pub))
-    await writer.drain()
-    msg_type, _cid, body = await wire.read_frame(reader)
+    # If the HELLO itself is "lost" per link conditions, skip the write and
+    # let the read below time out naturally — the same way a real sender
+    # would (never told, just eventually gives up), no special-casing needed.
+    if await apply_link_conditions(state, len(next_client_pub)):
+        writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, next_client_pub))
+        await writer.drain()
+    msg_type, _cid, body = await wire.read_frame_timeout(reader, "HELLO_REPLY")
     if msg_type != wire.MSG_HELLO_REPLY:
         raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
     return reader, writer, body
@@ -78,16 +82,17 @@ async def forward_downstream_to_upstream(
     d_reader: asyncio.StreamReader, circuit: CircuitState, state: RelayState
 ) -> None:
     """Relays both EXTENDED confirmations (circuit build) and DELIVERED
-    confirmations (data phase) blindly upstream. Deliberately NOT subject
-    to link conditions here: `build_circuit`'s read of an EXTENDED reply
-    has no timeout/retry, so losing one here would hang the whole circuit
-    build forever. Link conditions apply to the actual data-plane hops
-    instead (see `process_relay_fwd`), which is what the WAN-realism
-    metrics (latency/delivery) are meant to reflect anyway.
+    confirmations (data phase) blindly upstream, subject to this hop's
+    link conditions like every other transmission. Safe to lose one here
+    now that `build_circuit`'s reads have a timeout (see
+    `wire.read_frame_timeout`) — a lost EXTENDED reply surfaces as a
+    clear ProtocolError instead of hanging forever.
     """
     try:
         while True:
             _msg_type, _cid, body = await wire.read_frame(d_reader)
+            if not await apply_link_conditions(state, len(body)):
+                continue  # lost on this hop's upstream link
             circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, body))
             await circuit.upstream_writer.drain()
     except asyncio.IncompleteReadError:
@@ -99,12 +104,13 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
 
     if ctype == wire.CELL_EXTEND:
         host, port, next_pub, next_circuit_id = wire.unpack_extend(plaintext)
-        _d_reader, d_writer, server_pub = await open_downstream(host, port, next_circuit_id, next_pub)
+        _d_reader, d_writer, server_pub = await open_downstream(host, port, next_circuit_id, next_pub, state)
         circuit.downstream_writer = d_writer
         circuit.downstream_cid = next_circuit_id
         asyncio.create_task(forward_downstream_to_upstream(_d_reader, circuit, state))
-        circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, server_pub))
-        await circuit.upstream_writer.drain()
+        if await apply_link_conditions(state, len(server_pub)):
+            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, server_pub))
+            await circuit.upstream_writer.drain()
         return
 
     if ctype == wire.CELL_DATA:
@@ -143,8 +149,9 @@ async def handle_connection(
         client_pub = body
         priv, server_pub = crypto_layer.generate_ephemeral_keypair()
         key = crypto_layer.derive_key(priv, client_pub)
-        writer.write(wire.pack_frame(wire.MSG_HELLO_REPLY, circuit_id, server_pub))
-        await writer.drain()
+        if await apply_link_conditions(state, len(server_pub)):
+            writer.write(wire.pack_frame(wire.MSG_HELLO_REPLY, circuit_id, server_pub))
+            await writer.drain()
 
         circuit = CircuitState(key=key, upstream_writer=writer, upstream_cid=circuit_id)
         state.circuits[circuit_id] = circuit

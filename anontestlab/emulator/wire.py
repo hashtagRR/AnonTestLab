@@ -55,6 +55,21 @@ def pack_frame(msg_type: int, circuit_id: bytes, body: bytes) -> bytes:
     return struct.pack(">I", payload_len) + struct.pack(">B8s", msg_type, circuit_id) + body
 
 
+PROTOCOL_TIMEOUT_S = 5.0  # bound for a single expected reply to something just sent. Comfortably
+                           # above any realistic configured link_latency_ms + jitter, but short
+                           # enough that a lost handshake packet doesn't stall local iteration.
+
+
+async def read_frame_timeout(reader: asyncio.StreamReader, what: str) -> tuple[int, bytes, bytes]:
+    """Use for a single expected reply to something just sent (a handshake
+    step). Never for a loop awaiting an arbitrary future frame, where a
+    long legitimate gap between events would falsely trip the timeout."""
+    try:
+        return await asyncio.wait_for(read_frame(reader), timeout=PROTOCOL_TIMEOUT_S)
+    except asyncio.TimeoutError:
+        raise ProtocolError(f"timed out after {PROTOCOL_TIMEOUT_S}s waiting for {what}") from None
+
+
 async def read_frame(reader: asyncio.StreamReader) -> tuple[int, bytes, bytes] | None:
     length_bytes = await reader.readexactly(4)
     (payload_len,) = struct.unpack(">I", length_bytes)
