@@ -238,23 +238,23 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <div class="eyebrow">Real network emulator &middot; anonymity research</div>
-        <h1>Nothing here is a<br><span class="accent">timing model.</span></h1>
+        <div class="eyebrow">Anonymous communications emulator</div>
+        <h1>Test <span class="accent">432 configurations</span><br>against real conditions.</h1>
         <p class="lede">
-          Relay nodes are genuine OS processes on real loopback sockets, wired into
-          telescoping onion circuits with real per-hop AEAD encryption and a real
-          ECDHE handshake. Every latency, delivery, and correlation number comes
-          from actually running the protocol, not from sampling a distribution.
+          Every AEAD cipher, ECDHE curve, routing strategy, traffic shape, and
+          adversary model, run against a real onion-routed circuit of genuine OS
+          processes and real sockets. Latency, delivery, and correlation numbers
+          are measured outcomes, not samples from an assumed distribution.
         </p>
         <div class="cta-row">
           <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab">View the source</a>
-          <a class="btn" href="#contributions">What's novel here</a>
+          <a class="btn" href="#spec">See the test matrix</a>
         </div>
         <div class="hero-facts">
+          <div class="fact"><div class="num">432</div><div class="label">testable configurations</div></div>
           <div class="fact"><div class="num">6&times;3</div><div class="label">AEAD ciphers &times; ECDHE curves</div></div>
           <div class="fact"><div class="num">4</div><div class="label">pluggable adversaries</div></div>
           <div class="fact"><div class="num">254</div><div class="label">addressable relay processes</div></div>
-          <div class="fact"><div class="num">0.3</div><div class="label">current spec revision</div></div>
         </div>
       </div>
       <div class="instrument animate">
@@ -373,6 +373,11 @@ recall                         1.0000</div>
   <div class="wrap">
     <div class="eyebrow">03 &middot; configuration surface</div>
     <h2 style="font-size:2rem; font-weight:800; max-width:28ch;">Every axis is one YAML field away</h2>
+    <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
+      6 AEAD ciphers &times; 3 ECDHE curves &times; 2 routing strategies &times; 3
+      traffic distributions &times; 4 adversary models: 432 combinations, each one
+      a real config field, not a code change.
+    </p>
     <div class="spec-cols">
       <div class="tablewrap">
         <table>
