@@ -279,7 +279,7 @@ size alone (`path_length_leak_at_hop1`, 0.0 by design; `nan` if only one
 circuit length appears in the experiment, since there's nothing to
 distinguish).
 
-## Known limitations (v0.2)
+## Known limitations (v0.3)
 
 These are disclosed simplifications, not claims of security properties
 this doesn't have. The return path (delivery confirmations) isn't
