@@ -15,6 +15,10 @@ def test_default_config_is_valid():
     _config().validate()  # must not raise
 
 
+def test_per_edge_link_conditions_is_valid():
+    _config(link_per_edge=True, link_heterogeneity_spread=0.3).validate()  # must not raise
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

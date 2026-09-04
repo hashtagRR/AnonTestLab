@@ -33,6 +33,7 @@ class CircuitState:
     upstream_cid: bytes
     downstream_writer: asyncio.StreamWriter | None = None
     downstream_cid: bytes | None = None
+    downstream_edge_factor: float = 1.0  # this hop's own per-edge scale toward its downstream peer
     real_packet_count: int = 0
 
 
@@ -41,6 +42,10 @@ class RelayState:
     algorithm: str
     drop_probability: float
     keyexchange: str = "x25519"
+    own_index: int = 0
+    per_edge: bool = False
+    link_seed: int = 0
+    link_heterogeneity_spread: float = 0.5
     watermark_period: int = 0  # 0 = watermarking disabled
     watermark_delay_s: float = 0.0
     link_latency_s: float = 0.0
@@ -50,19 +55,44 @@ class RelayState:
     circuits: dict[bytes, CircuitState] = field(default_factory=dict)
 
 
-async def apply_link_conditions(state: RelayState, nbytes: int) -> bool:
-    """Models the link this hop is about to transmit on: real per-hop
-    latency/jitter/loss/bandwidth applied uniformly to every link in the
-    network (not per-edge; that would need a full topology model).
-    Returns False if this transmission is lost and must not be forwarded.
+def edge_factor(link_seed: int, i: int, j: int, spread: float) -> float:
+    """Deterministic per-edge scale factor for the link between relay
+    indices i and j, symmetric (same value regardless of order) so a
+    later bidirectional extension could reuse it unchanged. Only ever
+    computed by the connection-initiating side today (see
+    open_downstream), which always knows both indices locally without
+    needing to ask its peer; the receiving side isn't told, so its own
+    upstream-facing sends stay at the relay's plain per-node value
+    rather than this edge-specific one. A disclosed directional
+    simplification (see README's Known limitations), not a claim of a
+    fully symmetric edge model.
     """
-    if state.link_loss_probability > 0 and random.random() < state.link_loss_probability:
+    key = f"{link_seed}:{min(i, j)}:{max(i, j)}"
+    return random.Random(key).uniform(1 - spread, 1 + spread)
+
+
+async def apply_link_conditions(state: RelayState, nbytes: int, factor: float = 1.0) -> bool:
+    """Models the link this hop is about to transmit on: real per-hop
+    latency/jitter/loss/bandwidth. factor scales all four on top of the
+    relay's own (base or per-node-heterogeneous) values, the same
+    multiplicative convention orchestrator.py already uses for per-node
+    heterogeneity: > 1 means more latency/jitter/loss *and* more
+    bandwidth (each raw value scaled up), not a single "worse/better"
+    dial. Returns False if this transmission is lost and must not be
+    forwarded.
+    """
+    loss_probability = min(1.0, state.link_loss_probability * factor)
+    if loss_probability > 0 and random.random() < loss_probability:
         return False
     delay = 0.0
-    if state.link_latency_s > 0 or state.link_jitter_s > 0:
-        delay += max(0.0, random.gauss(state.link_latency_s, state.link_jitter_s))
+    latency_s = state.link_latency_s * factor
+    jitter_s = state.link_jitter_s * factor
+    if latency_s > 0 or jitter_s > 0:
+        delay += max(0.0, random.gauss(latency_s, jitter_s))
     if state.link_bandwidth_kbps:
-        delay += (nbytes * 8 / 1000) / state.link_bandwidth_kbps
+        bandwidth_kbps = state.link_bandwidth_kbps * factor
+        if bandwidth_kbps > 0:
+            delay += (nbytes * 8 / 1000) / bandwidth_kbps
     if delay > 0:
         await asyncio.sleep(delay)
     return True
@@ -70,18 +100,27 @@ async def apply_link_conditions(state: RelayState, nbytes: int) -> bool:
 
 async def open_downstream(
     host: str, port: int, circuit_id: bytes, next_client_pub: bytes, state: RelayState
-) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, bytes]:
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, bytes, float]:
+    """Returns (reader, writer, server_pub, factor): factor is this
+    specific edge's scale (1.0 if per-edge conditions are off), for the
+    caller to remember on CircuitState.downstream_edge_factor and reuse
+    for every later forward-direction send on this same connection.
+    """
+    factor = 1.0
+    if state.per_edge:
+        peer_index = wire.relay_index_from_host(host)
+        factor = edge_factor(state.link_seed, state.own_index, peer_index, state.link_heterogeneity_spread)
     reader, writer = await asyncio.open_connection(host, port)
     # If the HELLO itself is "lost" per link conditions, skip the write and
     # let the read below time out naturally, the same way a real sender
     # would (never told, just eventually gives up), no special-casing needed.
-    if await apply_link_conditions(state, len(next_client_pub)):
+    if await apply_link_conditions(state, len(next_client_pub), factor):
         writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, next_client_pub))
         await writer.drain()
     msg_type, _cid, body = await wire.read_frame_timeout(reader, "HELLO_REPLY")
     if msg_type != wire.MSG_HELLO_REPLY:
         raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
-    return reader, writer, body
+    return reader, writer, body, factor
 
 
 async def forward_downstream_to_upstream(
@@ -115,9 +154,12 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
 
     if ctype == wire.CELL_EXTEND:
         host, port, next_pub, next_circuit_id = wire.unpack_extend(plaintext)
-        _d_reader, d_writer, server_pub = await open_downstream(host, port, next_circuit_id, next_pub, state)
+        _d_reader, d_writer, server_pub, factor = await open_downstream(
+            host, port, next_circuit_id, next_pub, state
+        )
         circuit.downstream_writer = d_writer
         circuit.downstream_cid = next_circuit_id
+        circuit.downstream_edge_factor = factor
         asyncio.create_task(forward_downstream_to_upstream(_d_reader, circuit, state))
         sealed_pub = crypto_layer.seal(state.algorithm, circuit.key_back, server_pub, aad=circuit.upstream_cid)
         if await apply_link_conditions(state, len(sealed_pub)):
@@ -134,11 +176,11 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
                 and random.random() < state.drop_probability
             ):
                 return  # dropped at this hop
-            if kind == wire.KIND_REAL and state.watermark_period > 0:
+            if kind in (wire.KIND_REAL, wire.KIND_REAL_FRAGMENT) and state.watermark_period > 0:
                 circuit.real_packet_count += 1
                 if circuit.real_packet_count % state.watermark_period == 0:
                     await asyncio.sleep(state.watermark_delay_s)
-            if not await apply_link_conditions(state, len(inner)):
+            if not await apply_link_conditions(state, len(inner), circuit.downstream_edge_factor):
                 return  # lost on this hop's outbound link
             circuit.downstream_writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit.downstream_cid, inner))
             await circuit.downstream_writer.drain()
@@ -149,7 +191,11 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
                 return
             circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed))
             await circuit.upstream_writer.drain()
-        # cover packet at the terminal hop: silently discarded, no confirmation
+        # cover packet, or a non-final fragment (KIND_REAL_FRAGMENT) of a
+        # multi-cell real payload, at the terminal hop: silently absorbed,
+        # no confirmation. Only the final fragment arrives as plain
+        # KIND_REAL and triggers one, matching the one packet_id shared by
+        # every fragment (see circuit_client.py::Circuit.send).
 
 
 async def handle_connection(
@@ -195,11 +241,19 @@ async def run_relay(
     link_loss_probability: float = 0.0,
     link_bandwidth_kbps: float | None = None,
     keyexchange: str = "x25519",
+    own_index: int = 0,
+    per_edge: bool = False,
+    link_seed: int = 0,
+    link_heterogeneity_spread: float = 0.5,
 ) -> None:
     state = RelayState(
         algorithm=algorithm,
         drop_probability=drop_probability,
         keyexchange=keyexchange,
+        own_index=own_index,
+        per_edge=per_edge,
+        link_seed=link_seed,
+        link_heterogeneity_spread=link_heterogeneity_spread,
         watermark_period=watermark_period,
         watermark_delay_s=watermark_delay_s,
         link_latency_s=link_latency_s,
@@ -228,6 +282,10 @@ def main() -> None:
     parser.add_argument("--link-loss-probability", type=float, default=0.0)
     parser.add_argument("--link-bandwidth-kbps", type=float, default=0.0)
     parser.add_argument("--keyexchange", type=str, default="x25519")
+    parser.add_argument("--own-index", type=int, default=0)
+    parser.add_argument("--per-edge", action="store_true")
+    parser.add_argument("--link-seed", type=int, default=0)
+    parser.add_argument("--link-heterogeneity-spread", type=float, default=0.5)
     args = parser.parse_args()
     try:
         asyncio.run(
@@ -243,6 +301,10 @@ def main() -> None:
                 args.link_loss_probability,
                 args.link_bandwidth_kbps or None,
                 args.keyexchange,
+                args.own_index,
+                args.per_edge,
+                args.link_seed,
+                args.link_heterogeneity_spread,
             )
         )
     except KeyboardInterrupt:

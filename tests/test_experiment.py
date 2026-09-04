@@ -63,6 +63,43 @@ def test_fixed_cell_size_delivers_correctly_with_cover_and_drops():
     assert result.metrics["cover_packets_sent"] > 0
 
 
+def test_fragmented_payload_delivers_correctly_single_hop():
+    # PAYLOAD_SIZE is 256 bytes; cell_size=150 at 1 hop only fits ~112
+    # bytes per cell (150 - layer_overhead), so every real send must
+    # split into 3 fragment cells sharing one packet_id, confirmed only
+    # once by the terminal hop's own delivery-confirmation logic.
+    result = run_experiment(_small_config(cell_size=150, path_length=1, num_sessions=2))
+    assert result.metrics["delivery_rate"] == 1.0
+    assert result.metrics["real_packets_sent"] > 0
+
+
+def test_fragmented_payload_delivers_correctly_multi_hop_with_cover():
+    # cell_size=200 at 3 hops still fits an EXTEND cell (~60 bytes) but
+    # forces the 256-byte payload into 3 fragments per send, exercising
+    # fragment forwarding through non-terminal hops too.
+    result = run_experiment(
+        _small_config(cell_size=200, path_length=3, cover_rate=4.0, cover_drop_probability=0.3)
+    )
+    assert result.metrics["delivery_rate"] == 1.0
+    assert result.metrics["cover_packets_sent"] > 0
+
+
+def test_fragmented_payload_with_watermark_still_delivers():
+    # Fragments count individually toward the watermark's periodic
+    # counter (they're real wire-level cells); confirm that combination
+    # doesn't crash and still delivers everything.
+    result = run_experiment(
+        _small_config(
+            cell_size=150,
+            path_length=1,
+            watermark_period=5,
+            watermark_delay_ms=10.0,
+            adversaries=["watermark"],
+        )
+    )
+    assert result.metrics["delivery_rate"] == 1.0
+
+
 def test_fixed_rate_traffic_mode_produces_constant_total_output():
     # Low real rate relative to the fixed slot rate, so there's no backlog
     # spilling past the schedule, total output should equal slots exactly.
@@ -307,6 +344,40 @@ def test_bandwidth_weighted_routing_delivers_correctly():
         )
     )
     assert result.metrics["delivery_rate"] == 1.0
+
+
+def test_per_edge_link_conditions_deliver_correctly_multi_hop():
+    result = run_experiment(
+        _small_config(
+            path_length=3,
+            link_latency_ms=15.0,
+            link_per_edge=True,
+            link_heterogeneity_spread=0.6,
+            num_sessions=3,
+        )
+    )
+    assert result.metrics["delivery_rate"] == 1.0
+
+
+def test_per_edge_link_conditions_increase_latency_variance_across_seeds():
+    # Different seeds pick different edge factors along the same 3-hop
+    # path; that should surface as measurably different average latency
+    # from one seed to the next, evidence the per-edge factor is actually
+    # in effect rather than a no-op.
+    latencies = []
+    for seed in (1, 2, 3, 4, 5):
+        result = run_experiment(
+            _small_config(
+                seed=seed,
+                path_length=3,
+                link_latency_ms=30.0,
+                link_per_edge=True,
+                link_heterogeneity_spread=0.9,
+                num_sessions=1,
+            )
+        )
+        latencies.append(result.metrics["avg_latency_s"])
+    assert len(set(latencies)) > 1
 
 
 def test_run_experiment_with_baseline_produces_comparison(tmp_path):

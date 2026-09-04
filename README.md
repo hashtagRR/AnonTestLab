@@ -97,7 +97,8 @@ dimension below configurable.
                                                  ▼
                                      link_conditions: latency, jitter, loss,
                                      bandwidth (WAN realism), heterogeneous
-                                     (per-node variation instead of uniform)
+                                     (per-node variation), per_edge (per-link
+                                     variation, directional-only)
                                                  │
                                                  ▼
                                      adversary.types + per-type params
@@ -196,7 +197,8 @@ link_conditions:                   # WAN realism, applied per-hop via asyncio.sl
   loss_probability: 0.02
   bandwidth_kbps: 512
   heterogeneous: true              # vary these per node instead of uniform
-  heterogeneity_spread: 0.5         # each node's factor ~ Uniform(1-spread, 1+spread)
+  per_edge: true                    # also vary per (relay, peer) link, directional-only
+  heterogeneity_spread: 0.5         # shared spread for both: factor ~ Uniform(1-spread, 1+spread)
 
 crypto:
   algorithm: chacha20poly1305   # none | aes128gcm | aes256gcm | aes256gcmsiv | aes256ocb3 | chacha20poly1305
@@ -300,11 +302,22 @@ per hop *position within* a circuit: a single-link observer can't
 distinguish path lengths or real/cover/EXTEND from size alone, but a
 global observer watching multiple hops of the same circuit could infer
 something about hop depth from the size sequence (the `hop_depth`
-adversary measures exactly this). No fragmentation for payloads that
-don't fit the padding budget (a clear error instead). WAN link
-conditions can vary per node (`link_conditions.heterogeneous`), but
-still not truly per-edge: a relay behaves identically toward every peer
-it talks to, rather than having a different profile per link. Keys are
+adversary measures exactly this). Payloads that don't fit one cell's
+padding budget are fragmented across multiple cells sharing one
+packet_id (`circuit_client.py::Circuit.send`); only the final fragment
+triggers a delivery confirmation, and non-final fragments are marked
+`KIND_REAL_FRAGMENT` so intermediate hops forward them like any other
+cell while the terminal hop knows not to confirm early. WAN link
+conditions can vary per node (`link_conditions.heterogeneous`) or, more
+granularly, per edge (`link_conditions.per_edge`): a relay's send to a
+specific downstream peer gets that edge's own factor rather than the
+relay's flat self value. Per-edge conditions are directional-only,
+though, not a fully symmetric edge model: only the connection-initiating
+side's forward-direction sends are scaled by the edge factor (it always
+knows both endpoints locally); the receiving side's own upstream-facing
+sends on that same connection still use its plain per-node value, since
+telling it the edge factor would need a wire-protocol change this scope
+didn't take on. Keys are
 ephemeral only, with no relay identity/directory system, so there's no
 TOFU question to answer, but also no persistent relay reputation.
 `bandwidth_weighted` routing selects without replacement in proportion

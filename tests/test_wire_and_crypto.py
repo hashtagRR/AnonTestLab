@@ -9,7 +9,7 @@ import struct
 import pytest
 
 from anontestlab.emulator import crypto_layer, wire
-from anontestlab.emulator.circuit_client import pad_to_cell_size, unwrap_backward, wrap_layers
+from anontestlab.emulator.circuit_client import Circuit, pad_to_cell_size, unwrap_backward, wrap_layers
 
 
 def test_pack_unpack_extend_roundtrip():
@@ -301,3 +301,101 @@ def test_read_frame_rejects_undersized_length():
 
     with pytest.raises(wire.ProtocolError):
         asyncio.run(_run())
+
+
+class _FakeWriter:
+    """A minimal stand-in for asyncio.StreamWriter: Circuit.send() only
+    ever calls write()/drain() on it, never touches the reader."""
+
+    def __init__(self) -> None:
+        self.buffer = bytearray()
+
+    def write(self, data: bytes) -> None:
+        self.buffer.extend(data)
+
+    async def drain(self) -> None:
+        pass
+
+
+def test_send_fragments_an_oversized_payload_into_multiple_cells():
+    """A 300-byte payload doesn't fit a single 150-byte cell at 1 hop
+    (150 - layer_overhead leaves ~112 bytes of budget): send() must
+    split it into KIND_REAL_FRAGMENT cells sharing one packet_id, with
+    only the last cell using plain KIND_REAL, matching how
+    process_relay_fwd decides when to send a delivery confirmation."""
+
+    async def _run():
+        key = b"k" * 32
+        cid = b"11111111"
+        algorithm = "aes256gcm"
+        writer = _FakeWriter()
+        circuit = Circuit(
+            circuit_id=cid,
+            reader=None,
+            writer=writer,
+            keys_fwd=[key],
+            keys_back=[key],
+            circuit_ids=[cid],
+            algorithm=algorithm,
+            path=[("127.0.0.1", 1)],
+            cell_size=150,
+        )
+        packet_id = await circuit.send(wire.KIND_REAL, b"x" * 300)
+
+        reader = asyncio.StreamReader()
+        reader.feed_data(bytes(writer.buffer))
+        reader.feed_eof()
+        cells = []
+        while True:
+            try:
+                msg_type, frame_cid, body = await wire.read_frame(reader)
+            except asyncio.IncompleteReadError:
+                break
+            assert msg_type == wire.MSG_RELAY_FWD
+            assert frame_cid == cid
+            assert len(body) == 150  # every fragment still hits cell_size exactly
+            plaintext = crypto_layer.open_sealed(algorithm, key, body, aad=cid)
+            cells.append(wire.unpack_data(plaintext))
+        return packet_id, cells
+
+    packet_id, cells = asyncio.run(_run())
+
+    assert len(cells) >= 3  # 300 bytes / ~112-byte budget per cell
+    kinds = [k for k, _pid, _inner in cells]
+    assert kinds[:-1] == [wire.KIND_REAL_FRAGMENT] * (len(kinds) - 1)
+    assert kinds[-1] == wire.KIND_REAL
+    assert all(pid == packet_id for _k, pid, _inner in cells)
+
+
+def test_send_single_cell_payload_is_unfragmented():
+    """A payload that fits one cell must still be sent as plain KIND_REAL
+    with no fragment marker, the common case unaffected by fragmentation
+    support existing at all."""
+
+    async def _run():
+        key = b"k" * 32
+        cid = b"11111111"
+        algorithm = "aes256gcm"
+        writer = _FakeWriter()
+        circuit = Circuit(
+            circuit_id=cid,
+            reader=None,
+            writer=writer,
+            keys_fwd=[key],
+            keys_back=[key],
+            circuit_ids=[cid],
+            algorithm=algorithm,
+            path=[("127.0.0.1", 1)],
+            cell_size=512,
+        )
+        await circuit.send(wire.KIND_REAL, b"x" * 20)
+
+        reader = asyncio.StreamReader()
+        reader.feed_data(bytes(writer.buffer))
+        reader.feed_eof()
+        return await wire.read_frame(reader)
+
+    _msg_type, _cid, body = asyncio.run(_run())
+    plaintext = crypto_layer.open_sealed("aes256gcm", b"k" * 32, body, aad=b"11111111")
+    kind, _pid, _inner = wire.unpack_data(plaintext)
+    assert kind == wire.KIND_REAL

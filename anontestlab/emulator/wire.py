@@ -34,6 +34,33 @@ NONCE_LEN = 12
 PACK_DATA_HEADER_LEN = 10  # struct ">BBQ": cell_type + kind + packet_id
 MAX_FRAME_LEN = 1 << 20  # 1 MiB, comfortably above any real cell_size, bounds a malformed length field
 
+MAX_RELAYS_PER_SUBNET = 254  # 127.0.0.1 .. 127.0.0.254
+
+
+def relay_host(index: int) -> str:
+    """Each relay gets its own loopback IP (127.0.0.<n>) rather than
+    sharing 127.0.0.1 on a random port. Avoids port exhaustion on large
+    sweeps and makes tcpdump/Wireshark filtering sane (filter by IP, not
+    an ephemeral port list). Every address in 127.0.0.0/8 is loopback on
+    Linux with no extra configuration; macOS needs `ifconfig lo0 alias
+    127.0.0.x` first for anything beyond 127.0.0.1. Shared between
+    orchestrator.py (spawning relays) and relay_process.py (a relay
+    recovering a peer's index from its EXTEND-cell host, for per-edge
+    link conditions), so the two stay in sync by construction.
+    """
+    if index >= MAX_RELAYS_PER_SUBNET:
+        raise ValueError(f"more than {MAX_RELAYS_PER_SUBNET} relays not supported yet (got index {index})")
+    return f"127.0.0.{index + 1}"
+
+
+def relay_index_from_host(host: str) -> int:
+    """Inverse of relay_host. Raises ValueError for anything not in that
+    exact 127.0.0.<n> form (e.g. an address a relay wasn't spawned at)."""
+    prefix = "127.0.0."
+    if not host.startswith(prefix):
+        raise ValueError(f"'{host}' is not a relay_host()-formatted address")
+    return int(host[len(prefix) :]) - 1
+
 
 class ProtocolError(Exception):
     """A peer sent something that doesn't conform to the wire protocol.
@@ -135,3 +162,9 @@ KIND_CONTROL = 2  # an EXTEND cell in transit through an already-established
                   # forwarded uniformly. Must not be mistaken for real
                   # user traffic by kind-sensitive hop behavior (cover-drop,
                   # watermark counting, etc).
+KIND_REAL_FRAGMENT = 3  # a non-final fragment of a real payload split across
+                  # multiple cells (see circuit_client.py::Circuit.send).
+                  # Forwarded exactly like KIND_REAL (including watermark
+                  # counting), but the terminal hop must not confirm it:
+                  # only the final fragment, sent as plain KIND_REAL,
+                  # triggers a delivery confirmation.

@@ -99,15 +99,45 @@ class Circuit:
     cell_size: int | None = None
     _next_id: int = field(default=1)
 
-    async def send(self, kind: int, payload: bytes) -> int:
-        packet_id = self._next_id
-        self._next_id += 1
-        target_cell = wire.pack_data(kind, packet_id, payload)
+    async def _send_cell(self, kind: int, packet_id: int, chunk: bytes) -> None:
+        target_cell = wire.pack_data(kind, packet_id, chunk)
         if self.cell_size is not None:
             target_cell = pad_to_cell_size(target_cell, self.cell_size, self.algorithm, len(self.keys_fwd))
         sealed = wrap_layers(self.keys_fwd, self.circuit_ids, target_cell, self.algorithm, kind, packet_id)
         self.writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, self.circuit_id, sealed))
         await self.writer.drain()
+
+    async def send(self, kind: int, payload: bytes) -> int:
+        """Sends `payload` as one cell, or, if it doesn't fit the fixed
+        cell_size budget, splits it across multiple cells (fragmented
+        the same way regardless of why it didn't fit: a payload larger
+        than the budget, or a cell_size just too tight). All fragments
+        share this one packet_id; only the last is sent with the real
+        `kind` (KIND_REAL becomes KIND_REAL_FRAGMENT for every fragment
+        before it, so the terminal hop knows not to confirm early, see
+        relay_process.py::process_relay_fwd). cover payloads never need
+        the distinction: nothing confirms cover traffic either way, so
+        every fragment can just stay KIND_COVER.
+        """
+        packet_id = self._next_id
+        self._next_id += 1
+
+        if self.cell_size is None:
+            await self._send_cell(kind, packet_id, payload)
+            return packet_id
+
+        max_chunk = self.cell_size - wire.layer_overhead(self.algorithm) * len(self.keys_fwd)
+        if max_chunk <= 0:
+            raise ValueError(
+                f"cell_size={self.cell_size} is too small to fit even an empty cell at "
+                f"{len(self.keys_fwd)} hop(s) with {self.algorithm}"
+            )
+
+        chunks = [payload[i : i + max_chunk] for i in range(0, len(payload), max_chunk)] or [b""]
+        fragment_kind = wire.KIND_REAL_FRAGMENT if kind == wire.KIND_REAL else kind
+        for chunk in chunks[:-1]:
+            await self._send_cell(fragment_kind, packet_id, chunk)
+        await self._send_cell(kind, packet_id, chunks[-1])
         return packet_id
 
     async def recv_delivery(self) -> int:

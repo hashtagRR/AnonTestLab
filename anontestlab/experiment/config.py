@@ -73,14 +73,17 @@ class ExperimentConfig:
     # WAN realism, inside the relay forwarding path via asyncio.sleep. No
     # tc/netem/namespaces, so it stays fast local iteration. Every node
     # shares these base values unless link_heterogeneous scales each
-    # node's values by its own factor (still per-node, not truly
-    # per-edge: the same relay behaves identically toward every peer).
+    # node's values by its own factor, or link_per_edge additionally
+    # scales a relay's forward-direction send to a specific peer by a
+    # factor for that (relay, peer) pair (see relay_process.py::edge_factor
+    # for why this is directional-only, not a fully symmetric edge model).
     link_latency_ms: float = 0.0
     link_jitter_ms: float = 0.0
     link_loss_probability: float = 0.0
     link_bandwidth_kbps: float | None = None
     link_heterogeneous: bool = False
-    link_heterogeneity_spread: float = 0.5  # each node's factor ~ Uniform(1-spread, 1+spread)
+    link_heterogeneity_spread: float = 0.5  # each node's (or edge's) factor ~ Uniform(1-spread, 1+spread)
+    link_per_edge: bool = False
 
     observer_bin_width_ms: float = 50.0
     observer_classifier: str = "pearson"
@@ -291,6 +294,7 @@ class ExperimentConfig:
             link_heterogeneity_spread=link_conditions.get(
                 "heterogeneity_spread", cls.link_heterogeneity_spread
             ),
+            link_per_edge=link_conditions.get("per_edge", cls.link_per_edge),
         )
         config.validate()
         return config

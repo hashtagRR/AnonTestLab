@@ -48,20 +48,7 @@ class RelayHandle:
     bandwidth_weight: float = 1.0  # relative capacity, for bandwidth-weighted routing
 
 
-MAX_RELAYS_PER_SUBNET = 254  # 127.0.0.1 .. 127.0.0.254
-
-
-def _relay_host(index: int) -> str:
-    """Each relay gets its own loopback IP (127.0.0.<n>) rather than
-    sharing 127.0.0.1 on a random port. Avoids port exhaustion on large
-    sweeps and makes tcpdump/Wireshark filtering sane (filter by IP, not
-    an ephemeral port list). Every address in 127.0.0.0/8 is loopback on
-    Linux with no extra configuration; macOS needs `ifconfig lo0 alias
-    127.0.0.x` first for anything beyond 127.0.0.1.
-    """
-    if index >= MAX_RELAYS_PER_SUBNET:
-        raise ValueError(f"more than {MAX_RELAYS_PER_SUBNET} relays not supported yet (got index {index})")
-    return f"127.0.0.{index + 1}"
+_relay_host = wire.relay_host
 
 
 def _find_free_port(host: str) -> int:
@@ -85,12 +72,23 @@ async def spawn_relays(
     link_bandwidth_kbps: float | None = None,
     link_factors: list[float] | None = None,
     keyexchange: str = "x25519",
+    per_edge: bool = False,
+    link_seed: int = 0,
+    link_heterogeneity_spread: float = 0.5,
 ) -> list[RelayHandle]:
     """link_factors, if given, is one multiplicative scale per node index
     (node i's actual latency/jitter/loss/bandwidth = base * link_factors[i]),
     for a heterogeneous network instead of every relay sharing identical
     conditions. loss_probability is clamped to [0, 1] since a factor > 1
-    could otherwise push it out of range."""
+    could otherwise push it out of range.
+
+    per_edge, if set, additionally scales each relay's forward-direction
+    send to whichever peer it extends a circuit to, by a factor specific
+    to that (relay, peer) pair rather than the relay's own single value;
+    see relay_process.py::edge_factor for the directional-only scope of
+    this (the receiving side's own upstream-facing sends aren't scaled
+    by it, a disclosed simplification).
+    """
     handles = []
     for i in range(num_nodes):
         host = _relay_host(i)
@@ -98,7 +96,7 @@ async def spawn_relays(
         is_watermark_node = watermark_period > 0 and i == WATERMARK_NODE_INDEX
         factor = link_factors[i] if link_factors is not None else 1.0
         node_bandwidth_kbps = (link_bandwidth_kbps * factor) if link_bandwidth_kbps else 0.0
-        process = await asyncio.create_subprocess_exec(
+        args = [
             sys.executable,
             "-m",
             "anontestlab.emulator.relay_process",
@@ -124,6 +122,17 @@ async def spawn_relays(
             str(node_bandwidth_kbps),
             "--keyexchange",
             keyexchange,
+            "--own-index",
+            str(i),
+            "--link-seed",
+            str(link_seed),
+            "--link-heterogeneity-spread",
+            str(link_heterogeneity_spread),
+        ]
+        if per_edge:
+            args.append("--per-edge")
+        process = await asyncio.create_subprocess_exec(
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -319,6 +328,9 @@ async def run_experiment_async(
         config.link_bandwidth_kbps,
         link_factors,
         config.crypto_keyexchange,
+        config.link_per_edge,
+        config.seed * 7919 + 17,  # decorrelated from other seeded RNGs derived from config.seed
+        config.link_heterogeneity_spread,
     )
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
