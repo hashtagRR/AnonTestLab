@@ -49,6 +49,8 @@ def test_default_config_is_valid():
         {"link_heterogeneity_spread": 1.0},
         {"link_heterogeneity_spread": -0.1},
         {"routing_strategy": "bogus"},
+        {"crypto_algorithm": "des"},
+        {"crypto_keyexchange": "bogus"},
     ],
 )
 def test_invalid_values_are_rejected(overrides):

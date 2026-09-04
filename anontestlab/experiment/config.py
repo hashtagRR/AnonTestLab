@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from ..crypto import ALGORITHMS as CRYPTO_ALGORITHMS
+from ..emulator.crypto_layer import KEYEXCHANGES
 from ..routing import STRATEGIES
 
 
@@ -40,7 +42,8 @@ class ExperimentConfig:
     cover_rate: float = 0.0
     cover_drop_probability: float = 0.0
 
-    crypto_algorithm: str = "none"  # "none" | "aes256gcm" | "chacha20poly1305"
+    crypto_algorithm: str = "none"  # see anontestlab.crypto.ALGORITHMS for the full set
+    crypto_keyexchange: str = "x25519"  # "x25519" | "x448" | "p256", the handshake curve
 
     cell_size: int | None = None  # None = no shaping; else every cell is padded to this many wire bytes
 
@@ -130,8 +133,12 @@ class ExperimentConfig:
         if self.cell_size is not None:
             check(self.cell_size > 0, f"cell_size must be positive, got {self.cell_size}")
         check(
-            self.crypto_algorithm in ("none", "aes256gcm", "chacha20poly1305"),
-            f"crypto_algorithm must be one of none/aes256gcm/chacha20poly1305, got {self.crypto_algorithm!r}",
+            self.crypto_algorithm in CRYPTO_ALGORITHMS,
+            f"crypto_algorithm {self.crypto_algorithm!r} unknown, available: {sorted(CRYPTO_ALGORITHMS)}",
+        )
+        check(
+            self.crypto_keyexchange in KEYEXCHANGES,
+            f"crypto_keyexchange {self.crypto_keyexchange!r} unknown, available: {sorted(KEYEXCHANGES)}",
         )
         check(
             self.split_strategy in ("round_robin", "random"),
@@ -262,6 +269,7 @@ class ExperimentConfig:
                 "drop_probability", cls.cover_drop_probability
             ),
             crypto_algorithm=crypto.get("algorithm", cls.crypto_algorithm),
+            crypto_keyexchange=crypto.get("keyexchange", cls.crypto_keyexchange),
             cell_size=traffic_shaping.get("cell_size") if traffic_shaping.get("enabled") else None,
             traffic_mode=traffic_shaping.get("mode", cls.traffic_mode),
             fixed_rate=traffic_shaping.get("rate", cls.fixed_rate),

@@ -99,21 +99,26 @@ class Circuit:
         self.writer.close()
 
 
-async def build_circuit(path: list[tuple[str, int]], algorithm: str, cell_size: int | None = None) -> Circuit:
+async def build_circuit(
+    path: list[tuple[str, int]],
+    algorithm: str,
+    cell_size: int | None = None,
+    keyexchange: str = "x25519",
+) -> Circuit:
     circuit_id = os.urandom(wire.CIRCUIT_ID_LEN)
     reader, writer = await asyncio.open_connection(*path[0])
 
-    priv1, pub1 = crypto_layer.generate_ephemeral_keypair()
+    priv1, pub1 = crypto_layer.generate_ephemeral_keypair(keyexchange)
     writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, pub1))
     await writer.drain()
     msg_type, _cid, body = await wire.read_frame_timeout(reader, "HELLO_REPLY")
     if msg_type != wire.MSG_HELLO_REPLY:
         raise wire.ProtocolError(f"expected HELLO_REPLY, got msg_type={msg_type}")
-    keys = [crypto_layer.derive_key(priv1, body)]
+    keys = [crypto_layer.derive_key(priv1, body, algorithm, keyexchange)]
     circuit_ids = [circuit_id]
 
     for host, port in path[1:]:
-        priv_i, pub_i = crypto_layer.generate_ephemeral_keypair()
+        priv_i, pub_i = crypto_layer.generate_ephemeral_keypair(keyexchange)
         # A fresh ID for the *next* hop-link. The previous hop uses this on
         # its own connection to this hop, so no circuit ID is shared by two
         # links along the path.
@@ -127,7 +132,7 @@ async def build_circuit(path: list[tuple[str, int]], algorithm: str, cell_size: 
         msg_type, _cid, body = await wire.read_frame_timeout(reader, "RELAY_BACK (EXTENDED reply)")
         if msg_type != wire.MSG_RELAY_BACK:
             raise wire.ProtocolError(f"expected RELAY_BACK (EXTENDED reply), got msg_type={msg_type}")
-        keys.append(crypto_layer.derive_key(priv_i, body))
+        keys.append(crypto_layer.derive_key(priv_i, body, algorithm, keyexchange))
         circuit_ids.append(next_circuit_id)
 
     return Circuit(

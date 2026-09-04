@@ -157,8 +157,18 @@ isn't a field below, then run.</p>
 <div class="row"><label for="crypto_algorithm">Crypto algorithm</label>
   <select id="crypto_algorithm">
     <option value="none">none</option>
+    <option value="aes128gcm">aes128gcm</option>
     <option value="aes256gcm" selected>aes256gcm</option>
+    <option value="aes256gcmsiv">aes256gcmsiv</option>
+    <option value="aes256ocb3">aes256ocb3</option>
     <option value="chacha20poly1305">chacha20poly1305</option>
+  </select>
+</div>
+<div class="row"><label for="crypto_keyexchange">Key exchange curve</label>
+  <select id="crypto_keyexchange">
+    <option value="x25519" selected>x25519</option>
+    <option value="x448">x448</option>
+    <option value="p256">p256</option>
   </select>
 </div>
 
@@ -264,6 +274,7 @@ function generateYaml() {
     lines.push('');
     lines.push('crypto:');
     lines.push(`  algorithm: ${val('crypto_algorithm')}`);
+    lines.push(`  keyexchange: ${val('crypto_keyexchange')}`);
     lines.push('');
 
     const advTypes = [];

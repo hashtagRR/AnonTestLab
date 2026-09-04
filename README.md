@@ -5,10 +5,11 @@ evaluating anonymous communication network designs.
 
 Relay nodes run as **real OS processes**, each on its own loopback IP
 (`127.0.0.1`, `127.0.0.2`, ...), connected by a genuine telescoping
-(Tor-inspired) circuit with real per-hop AEAD encryption (AES-256-GCM /
-ChaCha20-Poly1305, real X25519 handshake per hop, and hop-local circuit
-IDs, so no identifier is shared across two links of the same path).
-Nothing here is a timing model. Latency, delivery, and correlation
+(Tor-inspired) circuit with real per-hop AEAD encryption (several
+algorithms selectable, see Crypto below) and a real ECDHE handshake per
+hop (x25519 by default, x448 or p256 also selectable), with hop-local
+circuit IDs so no identifier is shared across two links of the same
+path. Nothing here is a timing model. Latency, delivery, and correlation
 numbers all come from actually running the protocol over actual sockets.
 
 This is a research harness with its own simple wire protocol, not a
@@ -30,7 +31,7 @@ and the wire format is custom.
                               └───────────────────│───────────────────┘
                                                   ▼
                                     per session: build_circuit(), a
-                                    real telescoping handshake (X25519 +
+                                    real telescoping handshake (ECDHE +
                                     HKDF, hop-local circuit IDs), then send
                                     real onion-wrapped DATA cells (optionally
                                     padded to a fixed cell_size) over real
@@ -91,7 +92,7 @@ dimension below configurable.
                                      fixed_rate, the send schedule)
                                                  │
                                                  ▼
-                                     crypto.algorithm
+                                     crypto.algorithm, keyexchange (handshake curve)
                                                  │
                                                  ▼
                                      link_conditions: latency, jitter, loss,
@@ -198,7 +199,8 @@ link_conditions:                   # WAN realism, applied per-hop via asyncio.sl
   heterogeneity_spread: 0.5         # each node's factor ~ Uniform(1-spread, 1+spread)
 
 crypto:
-  algorithm: chacha20poly1305   # "none" | "aes256gcm" | "chacha20poly1305"
+  algorithm: chacha20poly1305   # none | aes128gcm | aes256gcm | aes256gcmsiv | aes256ocb3 | chacha20poly1305
+  keyexchange: x448              # x25519 (default) | x448 | p256, the handshake curve
 
 adversary:
   types: [global_observer, path_compromise]
@@ -214,6 +216,24 @@ baseline: baseline.yaml           # optional: diffs this run against another con
 
 See `examples/` for a Tor-like preset, a cover-traffic experiment, and a
 multi-path custom config.
+
+## Crypto
+
+`crypto.algorithm` picks the per-hop AEAD: `none` (plaintext passthrough,
+still real framing/transport, useful for isolating transport cost from
+crypto cost), `aes128gcm`, `aes256gcm`, `aes256gcmsiv` (nonce-misuse
+resistant variant of GCM), `aes256ocb3` (a faster construction), or
+`chacha20poly1305`. `crypto.keyexchange` picks the ECDHE curve for the
+per-hop handshake: `x25519` (default, Curve25519), `x448` (RFC 7748,
+larger keys, higher security margin), or `p256` (NIST secp256r1, for
+interop-focused comparisons). Both are whole-experiment settings, not
+negotiated per hop, since every relay in a circuit has to agree on them;
+the EXTEND cell's public-key field is length-prefixed rather than a
+fixed 32 bytes specifically so the wire format doesn't need to encode
+which curve is in use. A larger handshake key (x448's 56 bytes, p256's
+65-byte uncompressed point, vs x25519's 32) eats more of the fixed-size
+cell padding budget, so a very small `cell_size` combined with a long
+path may need raising to fit.
 
 ## Testing tools
 

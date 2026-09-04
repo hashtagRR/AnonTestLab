@@ -35,6 +35,7 @@ class CircuitState:
 class RelayState:
     algorithm: str
     drop_probability: float
+    keyexchange: str = "x25519"
     watermark_period: int = 0  # 0 = watermarking disabled
     watermark_delay_s: float = 0.0
     link_latency_s: float = 0.0
@@ -67,7 +68,7 @@ async def open_downstream(
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, bytes]:
     reader, writer = await asyncio.open_connection(host, port)
     # If the HELLO itself is "lost" per link conditions, skip the write and
-    # let the read below time out naturally — the same way a real sender
+    # let the read below time out naturally, the same way a real sender
     # would (never told, just eventually gives up), no special-casing needed.
     if await apply_link_conditions(state, len(next_client_pub)):
         writer.write(wire.pack_frame(wire.MSG_HELLO, circuit_id, next_client_pub))
@@ -85,7 +86,7 @@ async def forward_downstream_to_upstream(
     confirmations (data phase) blindly upstream, subject to this hop's
     link conditions like every other transmission. Safe to lose one here
     now that `build_circuit`'s reads have a timeout (see
-    `wire.read_frame_timeout`) — a lost EXTENDED reply surfaces as a
+    `wire.read_frame_timeout`): a lost EXTENDED reply surfaces as a
     clear ProtocolError instead of hanging forever.
     """
     try:
@@ -147,8 +148,8 @@ async def handle_connection(
         if msg_type != wire.MSG_HELLO:
             return
         client_pub = body
-        priv, server_pub = crypto_layer.generate_ephemeral_keypair()
-        key = crypto_layer.derive_key(priv, client_pub)
+        priv, server_pub = crypto_layer.generate_ephemeral_keypair(state.keyexchange)
+        key = crypto_layer.derive_key(priv, client_pub, state.algorithm, state.keyexchange)
         if await apply_link_conditions(state, len(server_pub)):
             writer.write(wire.pack_frame(wire.MSG_HELLO_REPLY, circuit_id, server_pub))
             await writer.drain()
@@ -179,10 +180,12 @@ async def run_relay(
     link_jitter_s: float = 0.0,
     link_loss_probability: float = 0.0,
     link_bandwidth_kbps: float | None = None,
+    keyexchange: str = "x25519",
 ) -> None:
     state = RelayState(
         algorithm=algorithm,
         drop_probability=drop_probability,
+        keyexchange=keyexchange,
         watermark_period=watermark_period,
         watermark_delay_s=watermark_delay_s,
         link_latency_s=link_latency_s,
@@ -210,6 +213,7 @@ def main() -> None:
     parser.add_argument("--link-jitter-ms", type=float, default=0.0)
     parser.add_argument("--link-loss-probability", type=float, default=0.0)
     parser.add_argument("--link-bandwidth-kbps", type=float, default=0.0)
+    parser.add_argument("--keyexchange", type=str, default="x25519")
     args = parser.parse_args()
     try:
         asyncio.run(
@@ -224,6 +228,7 @@ def main() -> None:
                 args.link_jitter_ms / 1000.0,
                 args.link_loss_probability,
                 args.link_bandwidth_kbps or None,
+                args.keyexchange,
             )
         )
     except KeyboardInterrupt:

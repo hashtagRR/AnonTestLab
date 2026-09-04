@@ -93,9 +93,31 @@ def test_cell_size_too_small_raises_clear_error():
 
 
 def test_all_crypto_algorithms_deliver_correctly():
-    for algorithm in ["none", "aes256gcm", "chacha20poly1305"]:
+    for algorithm in ["none", "aes128gcm", "aes256gcm", "aes256gcmsiv", "aes256ocb3", "chacha20poly1305"]:
         result = run_experiment(_small_config(crypto_algorithm=algorithm, num_sessions=1))
         assert result.metrics["delivery_rate"] == 1.0, f"algorithm={algorithm}"
+
+
+def test_all_keyexchange_curves_deliver_correctly():
+    for keyexchange in ["x25519", "x448", "p256"]:
+        result = run_experiment(_small_config(crypto_keyexchange=keyexchange, num_sessions=1))
+        assert result.metrics["delivery_rate"] == 1.0, f"keyexchange={keyexchange}"
+
+
+def test_keyexchange_with_fixed_size_cells_and_multipath():
+    """The larger p256/x448 pubkeys eat more of the padding budget inside
+    EXTEND cells; confirm they still fit a realistic cell_size across a
+    multi-hop path."""
+    for keyexchange in ["x25519", "x448", "p256"]:
+        result = run_experiment(
+            _small_config(
+                crypto_keyexchange=keyexchange,
+                cell_size=512,
+                path_length=3,
+                extra_paths=[PathSpec("random", 2)],
+            )
+        )
+        assert result.metrics["delivery_rate"] == 1.0, f"keyexchange={keyexchange}"
 
 
 def test_path_selection_and_traffic_schedule_reproducible_with_fixed_seed():

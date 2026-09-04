@@ -3,8 +3,10 @@
 Frame:  [4-byte big-endian length][1-byte msg_type][8-byte circuit_id][body]
 
 msg_type:
-  HELLO       body = client ephemeral X25519 public key (32 bytes)
-  HELLO_REPLY body = server ephemeral X25519 public key (32 bytes)
+  HELLO       body = client ephemeral public key (length depends on the
+              experiment's keyexchange curve: 32 bytes for x25519, 56 for
+              x448, 65 for p256's uncompressed point)
+  HELLO_REPLY body = server ephemeral public key, same curve as HELLO
   RELAY_FWD   body = nonce(12) + AEAD ciphertext, addressed to whichever
               hop owns the circuit key on the connection it arrives on
   RELAY_BACK  body = opaque bytes, always forwarded upstream verbatim by
@@ -28,15 +30,14 @@ MSG_RELAY_FWD = 0x03
 MSG_RELAY_BACK = 0x04
 
 CIRCUIT_ID_LEN = 8
-PUBKEY_LEN = 32
 NONCE_LEN = 12
 PACK_DATA_HEADER_LEN = 10  # struct ">BBQ": cell_type + kind + packet_id
-MAX_FRAME_LEN = 1 << 20  # 1 MiB — comfortably above any real cell_size, bounds a malformed length field
+MAX_FRAME_LEN = 1 << 20  # 1 MiB, comfortably above any real cell_size, bounds a malformed length field
 
 
 class ProtocolError(Exception):
     """A peer sent something that doesn't conform to the wire protocol.
-    Distinct from a bug in this codebase (an AssertionError) — this is
+    Distinct from a bug in this codebase (an AssertionError): this is
     for untrusted-input validation, which should never be silently
     disabled by running Python with -O."""
 
@@ -81,11 +82,16 @@ async def read_frame(reader: asyncio.StreamReader) -> tuple[int, bytes, bytes] |
 
 
 def pack_extend(host: str, port: int, next_client_pub: bytes, next_circuit_id: bytes) -> bytes:
+    """The pubkey field is length-prefixed (not a fixed width) since its
+    size depends on the experiment's keyexchange curve (32/56/65 bytes
+    for x25519/x448/p256), and every hop must be able to parse an EXTEND
+    cell without being separately told which curve is in use."""
     host_bytes = host.encode("ascii")
     return (
         struct.pack(">BB", 0x01, len(host_bytes))
         + host_bytes
         + struct.pack(">H", port)
+        + struct.pack(">B", len(next_client_pub))
         + next_client_pub
         + next_circuit_id
     )
@@ -98,8 +104,10 @@ def unpack_extend(body: bytes) -> tuple[str, int, bytes, bytes]:
     offset += host_len
     (port,) = struct.unpack(">H", body[offset : offset + 2])
     offset += 2
-    next_client_pub = body[offset : offset + PUBKEY_LEN]
-    offset += PUBKEY_LEN
+    (pub_len,) = struct.unpack(">B", body[offset : offset + 1])
+    offset += 1
+    next_client_pub = body[offset : offset + pub_len]
+    offset += pub_len
     next_circuit_id = body[offset : offset + CIRCUIT_ID_LEN]
     return host, port, next_client_pub, next_circuit_id
 

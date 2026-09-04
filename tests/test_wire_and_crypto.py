@@ -18,6 +18,16 @@ def test_pack_unpack_extend_roundtrip():
     assert (host, port, pub, next_cid) == ("127.0.0.1", 54321, b"P" * 32, b"Q" * 8)
 
 
+@pytest.mark.parametrize("pubkey_len", [32, 56, 65])  # x25519, x448, p256 (uncompressed)
+def test_pack_unpack_extend_roundtrip_at_every_curve_pubkey_length(pubkey_len):
+    """The pubkey field is length-prefixed, not a fixed 32 bytes, since
+    the curve is an experiment-wide config choice, not fixed at 32 bytes
+    like x25519 alone would be."""
+    body = wire.pack_extend("127.0.0.1", 54321, b"P" * pubkey_len, b"Q" * 8)
+    host, port, pub, next_cid = wire.unpack_extend(body)
+    assert (host, port, pub, next_cid) == ("127.0.0.1", 54321, b"P" * pubkey_len, b"Q" * 8)
+
+
 def test_pack_unpack_data_roundtrip():
     body = wire.pack_data(wire.KIND_COVER, 7, b"payload-bytes")
     kind, packet_id, inner = wire.unpack_data(body)
@@ -37,21 +47,46 @@ def test_frame_pack_read_roundtrip():
     assert (msg_type, cid, body) == (wire.MSG_RELAY_FWD, b"abcdefgh", b"body-bytes")
 
 
-@pytest.mark.parametrize("algorithm", ["none", "aes256gcm", "chacha20poly1305"])
+@pytest.mark.parametrize(
+    "algorithm",
+    ["none", "aes128gcm", "aes256gcm", "aes256gcmsiv", "aes256ocb3", "chacha20poly1305"],
+)
 def test_seal_open_roundtrip(algorithm):
-    key = b"k" * 32
+    from anontestlab.crypto import key_length
+
+    key = b"k" * key_length(algorithm)
     sealed = crypto_layer.seal(algorithm, key, b"secret message", aad=b"circuit1")
     opened = crypto_layer.open_sealed(algorithm, key, sealed, aad=b"circuit1")
     assert opened == b"secret message"
 
 
-def test_ecdh_handshake_derives_matching_key():
-    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
-    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
-    key_a = crypto_layer.derive_key(priv_a, pub_b)
-    key_b = crypto_layer.derive_key(priv_b, pub_a)
+@pytest.mark.parametrize("keyexchange", ["x25519", "x448", "p256"])
+def test_ecdh_handshake_derives_matching_key(keyexchange):
+    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair(keyexchange)
+    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair(keyexchange)
+    key_a = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm", keyexchange)
+    key_b = crypto_layer.derive_key(priv_b, pub_a, "aes256gcm", keyexchange)
     assert key_a == key_b
     assert len(key_a) == 32
+
+
+@pytest.mark.parametrize("algorithm,expected_len", [("aes128gcm", 16), ("aes256gcm", 32)])
+def test_derive_key_length_matches_algorithm(algorithm, expected_len):
+    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
+    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
+    key = crypto_layer.derive_key(priv_a, pub_b, algorithm)
+    assert len(key) == expected_len
+
+
+def test_mismatched_keyexchange_between_peers_fails_or_mismatches():
+    """Nothing in the wire format tells a peer which curve to use (it's a
+    whole-experiment setting), so this is a configuration error to avoid,
+    not something the protocol detects. Guard that it fails loudly (wrong
+    key size for that curve) rather than silently deriving usable keys."""
+    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair("x25519")
+    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair("x448")
+    with pytest.raises(ValueError):
+        crypto_layer.derive_key(priv_a, pub_b, "aes256gcm", "x25519")
 
 
 def test_wrap_layers_peels_correctly_through_intermediate_hops():

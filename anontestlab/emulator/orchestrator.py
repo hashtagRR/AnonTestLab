@@ -84,6 +84,7 @@ async def spawn_relays(
     link_loss_probability: float = 0.0,
     link_bandwidth_kbps: float | None = None,
     link_factors: list[float] | None = None,
+    keyexchange: str = "x25519",
 ) -> list[RelayHandle]:
     """link_factors, if given, is one multiplicative scale per node index
     (node i's actual latency/jitter/loss/bandwidth = base * link_factors[i]),
@@ -121,6 +122,8 @@ async def spawn_relays(
             str(min(1.0, link_loss_probability * factor)),
             "--link-bandwidth-kbps",
             str(node_bandwidth_kbps),
+            "--keyexchange",
+            keyexchange,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -222,7 +225,10 @@ async def run_session(
 
     build_start = time.monotonic()
     circuits: list[Circuit] = await asyncio.gather(
-        *[build_circuit(p, config.crypto_algorithm, config.cell_size) for p in addr_paths]
+        *[
+            build_circuit(p, config.crypto_algorithm, config.cell_size, config.crypto_keyexchange)
+            for p in addr_paths
+        ]
     )
     build_delay = time.monotonic() - build_start
 
@@ -312,6 +318,7 @@ async def run_experiment_async(
         config.link_loss_probability,
         config.link_bandwidth_kbps,
         link_factors,
+        config.crypto_keyexchange,
     )
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
