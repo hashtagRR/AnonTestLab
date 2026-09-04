@@ -68,6 +68,11 @@ run.
 
 ## Quickstart
 
+Commands below are for Linux/macOS. On Windows, use PowerShell with a
+standard python.org Python (not the one bundled with MSYS2/Git Bash);
+see [INSTALL.md](INSTALL.md) for the full platform-specific guide and a
+Windows troubleshooting checklist.
+
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/atl run examples/tor_like.yaml
