@@ -84,8 +84,9 @@ dimension below configurable.
                                      cover_behaviour.drop_probability
                                                  │
                                                  ▼
-                                     traffic_shaping: cell_size,
-                                     mode (fixed_size | fixed_rate | none)
+                                     traffic_shaping: cell_size (fixed-size cell
+                                     padding, independent toggle), mode (variable |
+                                     fixed_rate, the send schedule)
                                                  │
                                                  ▼
                                      crypto.algorithm
@@ -123,7 +124,16 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/atl dashboard                  # http://127.0.0.1:8765
 ```
 
+`atl run` and `atl wizard` print live progress as relays spawn and each
+session completes, so a multi-second run isn't a silent wait:
+
 ```
+Running tor-like...
+  10 relays ready
+  session 1/10 complete (37/37 real delivered, build 34ms)
+  session 2/10 complete (37/37 real delivered, build 29ms)
+  ...
+
 Results for tor-like
 ────────────────────────────────────────
 real_packets_sent              375
@@ -136,6 +146,10 @@ precision                      1.0000
 recall                         1.0000
 ...
 ```
+
+The dashboard shows the same progress live: it starts the run in the
+background and polls for updates, rather than blocking the page until
+the whole experiment finishes.
 
 ## Writing an experiment
 
@@ -165,9 +179,11 @@ traffic:
   cover_rate: 0                  # >0 to enable cover traffic
 
 traffic_shaping:
-  enabled: true
+  enabled: true                    # turns on fixed-size cell padding below
   cell_size: 512                  # every cell padded to this many wire bytes
-  mode: fixed_size                 # "fixed_size" | "fixed_rate" | "none"
+  mode: fixed_rate                 # "variable" (default) | "fixed_rate": the send
+                                     # schedule, independent of cell_size padding
+  rate: 20                          # packets/sec on the wire when mode == "fixed_rate"
 
 link_conditions:                   # WAN realism, applied per-hop via asyncio.sleep
   latency_ms: 50
