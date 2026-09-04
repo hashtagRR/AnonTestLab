@@ -8,7 +8,7 @@ prebuilt wheels yet for numpy/cryptography on every platform, which
 forces pip to compile them from source: slow, and a much larger chance
 of hitting a broken toolchain.
 
-## Linux
+## GNU/Linux
 
 ```bash
 python3 -m venv .venv
