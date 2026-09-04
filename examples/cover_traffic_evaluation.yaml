@@ -1,0 +1,30 @@
+experiment:
+  name: cover-traffic-evaluation
+  mode: custom
+  seed: 20260903
+  duration_s: 8
+
+network:
+  nodes: 12
+
+sessions:
+  count: 10
+
+routing:
+  strategy: random
+  path_length: 3
+
+traffic:
+  real_rate: 5          # packets/sec of real traffic per session
+  distribution: poisson
+  cover_rate: 10          # packets/sec of cover traffic per session
+  cover_distribution: poisson
+
+cover_behaviour:
+  drop_probability: 0.15  # probability a cover packet is dropped at each intermediate hop
+
+crypto:
+  algorithm: aes256gcm
+
+adversary:
+  type: global_observer

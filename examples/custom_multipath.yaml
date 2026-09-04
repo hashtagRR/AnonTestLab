@@ -1,0 +1,33 @@
+experiment:
+  name: custom-multipath
+  mode: custom
+  seed: 20260903
+  duration_s: 8
+
+network:
+  nodes: 15
+
+sessions:
+  count: 10
+
+routing:
+  paths:
+    - strategy: random
+      path_length: 3
+    - strategy: random
+      path_length: 4
+  split_strategy: round_robin
+
+traffic:
+  real_rate: 6
+  distribution: poisson
+  cover_rate: 0
+
+crypto:
+  algorithm: chacha20poly1305
+
+adversary:
+  types: [global_observer, path_compromise]
+  observed_paths: 1        # adversary only sees one of the two paths
+  compromised_fraction: 0.15
+  compromise_trials: 3000

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AnonTestLab Dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .3rem; }
+  fieldset { border: 1px solid #8884; border-radius: 8px; margin-bottom: 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: inline-block; min-width: 220px; margin: .3rem 0; }
+  input[type=number], input[type=text], select { width: 140px; }
+  .row { display: flex; align-items: center; margin: .3rem 0; flex-wrap: wrap; }
+  .hidden { display: none !important; }
+  textarea { width: 100%; min-height: 260px; font-family: ui-monospace, monospace; font-size: .85rem; box-sizing: border-box; }
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; margin-right: .5rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: .5rem; }
+  td, th { border: 1px solid #8884; padding: .3rem .6rem; text-align: left; font-size: .9rem; }
+  #status { margin: .5rem 0; font-style: italic; }
+  #error { color: #c0392b; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>AnonTestLab Dashboard</h1>
+<p>A form over the same YAML experiment format the CLI uses. Fill in the
+basics, generate the YAML, tweak it directly if you need an advanced
+option (traffic shaping, link conditions, AS groups, watermarking) that
+isn't a field below, then run.</p>
+
+<h2>1. Mode</h2>
+<div class="row">
+  <label><input type="radio" name="mode" value="tor_like" checked onchange="onModeChange()"> tor_like (fixed preset)</label>
+  <label><input type="radio" name="mode" value="custom" onchange="onModeChange()"> custom</label>
+</div>
+
+<h2>2. Basics</h2>
+<div class="row"><label for="name">Experiment name</label><input type="text" id="name" value="dashboard-run"></div>
+<div class="row"><label for="seed">Seed</label><input type="number" id="seed" value="20260903"></div>
+<div class="row"><label for="duration_s">Duration (s)</label><input type="number" id="duration_s" value="8" step="0.5"></div>
+<div class="row"><label for="num_sessions">Sessions</label><input type="number" id="num_sessions" value="8"></div>
+<div class="row"><label for="num_nodes">Relay nodes</label><input type="number" id="num_nodes" value="10"></div>
+<div class="row"><label for="real_rate">Real traffic rate (pkt/s)</label><input type="number" id="real_rate" value="5" step="0.5"></div>
+
+<fieldset id="custom-fields">
+<legend>3. Custom-only</legend>
+
+<div class="row"><label for="path_length">Path length (hops)</label><input type="number" id="path_length" value="3"></div>
+<div class="row"><label for="num_paths">Number of paths</label><input type="number" id="num_paths" value="1" onchange="onPathsChange()"></div>
+<div class="row" id="split-row"><label for="split_strategy">Split strategy</label>
+  <select id="split_strategy"><option value="round_robin">round_robin</option><option value="random">random</option></select>
+</div>
+
+<div class="row"><label><input type="checkbox" id="cover_enabled" onchange="onCoverChange()"> Enable cover traffic</label></div>
+<div class="row hidden" id="cover-fields">
+  <label for="cover_rate">Cover rate (pkt/s)</label><input type="number" id="cover_rate" value="5" step="0.5">
+  <label for="cover_drop">Drop probability/hop</label><input type="number" id="cover_drop" value="0" step="0.05" min="0" max="1">
+</div>
+
+<div class="row"><label for="crypto_algorithm">Crypto algorithm</label>
+  <select id="crypto_algorithm">
+    <option value="none">none</option>
+    <option value="aes256gcm" selected>aes256gcm</option>
+    <option value="chacha20poly1305">chacha20poly1305</option>
+  </select>
+</div>
+
+<div class="row"><label>Adversaries</label>
+  <label style="min-width:auto; margin-right:1rem"><input type="checkbox" id="adv_global" checked> global_observer</label>
+  <label style="min-width:auto; margin-right:1rem"><input type="checkbox" id="adv_compromise" onchange="onCompromiseChange()"> path_compromise</label>
+  <label style="min-width:auto"><input type="checkbox" id="adv_watermark"> watermark</label>
+</div>
+<div class="row hidden" id="compromise-fields">
+  <label for="compromised_fraction">Compromised fraction</label><input type="number" id="compromised_fraction" value="0.1" step="0.05" min="0" max="1">
+  <label for="compromise_trials">Monte Carlo trials</label><input type="number" id="compromise_trials" value="2000">
+</div>
+</fieldset>
+
+<div class="row">
+  <button onclick="generateYaml()">Generate YAML</button>
+</div>
+
+<h2>4. Experiment YAML (edit freely, including advanced options)</h2>
+<textarea id="yaml"></textarea>
+
+<div class="row">
+  <button onclick="runExperiment()">Run Experiment</button>
+</div>
+<div id="status"></div>
+<div id="error"></div>
+
+<h2>Results</h2>
+<div id="results"></div>
+
+<script>
+function onModeChange() {
+  const custom = document.querySelector('input[name=mode]:checked').value === 'custom';
+  document.getElementById('custom-fields').classList.toggle('hidden', !custom);
+}
+function onCoverChange() {
+  document.getElementById('cover-fields').classList.toggle('hidden', !document.getElementById('cover_enabled').checked);
+}
+function onCompromiseChange() {
+  document.getElementById('compromise-fields').classList.toggle('hidden', !document.getElementById('adv_compromise').checked);
+}
+function onPathsChange() {
+  document.getElementById('split-row').classList.toggle('hidden', Number(document.getElementById('num_paths').value) <= 1);
+}
+onModeChange(); onCoverChange(); onCompromiseChange(); onPathsChange();
+
+function val(id) { return document.getElementById(id).value; }
+function checked(id) { return document.getElementById(id).checked; }
+
+function generateYaml() {
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  const lines = [];
+  lines.push('experiment:');
+  lines.push(`  name: ${val('name')}`);
+  lines.push(`  mode: ${mode}`);
+  lines.push(`  seed: ${val('seed')}`);
+  lines.push(`  duration_s: ${val('duration_s')}`);
+  lines.push('');
+  lines.push('network:');
+  lines.push(`  nodes: ${val('num_nodes')}`);
+  lines.push('');
+  lines.push('sessions:');
+  lines.push(`  count: ${val('num_sessions')}`);
+  lines.push('');
+
+  if (mode === 'tor_like') {
+    lines.push('routing:');
+    lines.push('  strategy: random');
+    lines.push('  path_length: 3');
+    lines.push('');
+    lines.push('traffic:');
+    lines.push(`  real_rate: ${val('real_rate')}`);
+    lines.push('  cover_rate: 0');
+    lines.push('');
+    lines.push('adversary:');
+    lines.push('  type: global_observer');
+  } else {
+    const numPaths = Number(val('num_paths')) || 1;
+    lines.push('routing:');
+    if (numPaths > 1) {
+      lines.push('  paths:');
+      for (let i = 0; i < numPaths; i++) {
+        lines.push('    - strategy: random');
+        lines.push(`      path_length: ${val('path_length')}`);
+      }
+      lines.push(`  split_strategy: ${val('split_strategy')}`);
+    } else {
+      lines.push('  strategy: random');
+      lines.push(`  path_length: ${val('path_length')}`);
+    }
+    lines.push('');
+    lines.push('traffic:');
+    lines.push(`  real_rate: ${val('real_rate')}`);
+    if (checked('cover_enabled')) {
+      lines.push(`  cover_rate: ${val('cover_rate')}`);
+      lines.push('');
+      lines.push('cover_behaviour:');
+      lines.push(`  drop_probability: ${val('cover_drop')}`);
+    } else {
+      lines.push('  cover_rate: 0');
+    }
+    lines.push('');
+    lines.push('crypto:');
+    lines.push(`  algorithm: ${val('crypto_algorithm')}`);
+    lines.push('');
+
+    const advTypes = [];
+    if (checked('adv_global')) advTypes.push('global_observer');
+    if (checked('adv_compromise')) advTypes.push('path_compromise');
+    if (checked('adv_watermark')) advTypes.push('watermark');
+    lines.push('adversary:');
+    lines.push(`  types: [${advTypes.join(', ')}]`);
+    if (checked('adv_compromise')) {
+      lines.push(`  compromised_fraction: ${val('compromised_fraction')}`);
+      lines.push(`  compromise_trials: ${val('compromise_trials')}`);
+    }
+  }
+  document.getElementById('yaml').value = lines.join('\n') + '\n';
+}
+generateYaml();
+
+async function runExperiment() {
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  const resultsEl = document.getElementById('results');
+  errorEl.textContent = '';
+  resultsEl.innerHTML = '';
+  statusEl.textContent = 'Running: this spawns real relay subprocesses and waits out the experiment duration, so it can take a while...';
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ yaml_text: document.getElementById('yaml').value }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || `HTTP ${resp.status}`);
+    }
+    statusEl.textContent = `Done, written to ${data.out_dir}/`;
+    resultsEl.appendChild(metricsTable(data.name, data.metrics));
+    if (data.baseline) {
+      resultsEl.appendChild(compareTable(data.baseline.name, data.baseline.metrics, data.name, data.metrics));
+    }
+  } catch (e) {
+    statusEl.textContent = '';
+    errorEl.textContent = 'Error: ' + e.message;
+  }
+}
+
+function fmt(v) {
+  if (v === null || v === undefined) return 'nan';
+  if (typeof v === 'number' && !Number.isInteger(v)) return v.toFixed(4);
+  return String(v);
+}
+
+function metricsTable(name, metrics) {
+  const table = document.createElement('table');
+  table.innerHTML = `<caption>${name}</caption><tr><th>metric</th><th>value</th></tr>` +
+    Object.entries(metrics).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v)}</td></tr>`).join('');
+  return table;
+}
+
+function compareTable(baseName, baseMetrics, treatName, treatMetrics) {
+  const keys = [...new Set([...Object.keys(baseMetrics), ...Object.keys(treatMetrics)])].sort();
+  const table = document.createElement('table');
+  table.innerHTML = `<caption>Baseline comparison (${baseName} vs ${treatName})</caption>` +
+    `<tr><th>metric</th><th>${baseName}</th><th>${treatName}</th></tr>` +
+    keys.map(k => `<tr><td>${k}</td><td>${fmt(baseMetrics[k])}</td><td>${fmt(treatMetrics[k])}</td></tr>`).join('');
+  return table;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+experiment:
+  name: tor-like
+  mode: tor_like
+  seed: 20260903
+  duration_s: 8
+
+network:
+  nodes: 10
+
+sessions:
+  count: 10
+
+routing:
+  strategy: random
+  path_length: 3
+
+traffic:
+  real_rate: 5
+  distribution: poisson
+  cover_rate: 0
+
+crypto:
+  algorithm: aes256gcm
+
+adversary:
+  type: global_observer
