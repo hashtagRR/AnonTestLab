@@ -27,15 +27,15 @@ and the wire format is custom.
                     N real subprocesses,   picks nodes per      real: Poisson/const
                     each 127.0.0.<n>       path (1..N paths)    cover: Poisson/const/fixed_rate
                               │                   │                   │
-                              └───────────────────┴─────────┬─────────┘
-                                                              ▼
-                                         per session: build_circuit(), a
-                                         real telescoping handshake (X25519 +
-                                         HKDF, hop-local circuit IDs), then send
-                                         real onion-wrapped DATA cells (optionally
-                                         padded to a fixed cell_size) over real
-                                         sockets, each hop optionally modeling
-                                         WAN latency/jitter/loss/bandwidth
+                              └───────────────────│───────────────────┘
+                                                  ▼
+                                    per session: build_circuit(), a
+                                    real telescoping handshake (X25519 +
+                                    HKDF, hop-local circuit IDs), then send
+                                    real onion-wrapped DATA cells (optionally
+                                    padded to a fixed cell_size) over real
+                                    sockets, each hop optionally modeling
+                                    WAN latency/jitter/loss/bandwidth
                                                               │
                               ┌───────────────────────────────┼───────────────────┐
                               ▼                                                    ▼
