@@ -282,6 +282,25 @@ rather than a dict, since each curve's key-generation and ECDH calls
 have a genuinely different shape (see `KEYEXCHANGES` for the current
 set).
 
+## Provenance
+AnonTestLab began as a generalization of the evaluation methodology and
+test harness built for a research project on dual-path anonymous
+communication network design (Anon-Sec-Net), and reuses portions of that
+codebase and test suite. This project generalizes that methodology
+beyond one specific system's protocol and testbed: a protocol-agnostic
+emulator with pluggable adversary models and configurable routing,
+rather than a tool scoped to any single design under test.
+
+The originating research is described in two papers currently under
+submission:
+
+- "Anon-Sec-Net: Anonymous and Secure Communication at the Network Layer"
+- "Does Splitting Help? An Empirical Evaluation of Dual-Path Routing for
+  Anonymous Communication"
+
+Code and evaluation scripts for that project will be linked here once
+those papers are published.
+
 ## License
 
 GPL-3.0-or-later. See `LICENSE`.
