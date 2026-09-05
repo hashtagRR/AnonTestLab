@@ -14,6 +14,8 @@ class Packet:
     path: list[str]
     created_at: float
     delivered_at: float | None = None
+    real_seq: int | None = None  # 1-indexed position among this circuit's real sends,
+    # independent of cover traffic; used to align with the watermark relay's own count
 
     @property
     def delivered(self) -> bool:

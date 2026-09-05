@@ -68,8 +68,13 @@ class HopDepthAdversary(Adversary):
             # there's nothing to distinguish between; not measurable here.
             path_length_leak = float("nan")
         else:
-            hop1_sizes = {self._hop_size(1) for _ in lengths_seen}
-            path_length_leak = 1.0 if len(hop1_sizes) > 1 else 0.0
+            # _hop_size(1) takes no length argument and is therefore the
+            # same value for every circuit regardless of how long it is:
+            # that's the padding invariant this metric exists to confirm,
+            # not something to recompute per length. Made explicit rather
+            # than looped over lengths_seen, which produced the same 0.0
+            # while reading as if it were measuring something per-length.
+            path_length_leak = 0.0
 
         return AdversaryResult(
             name=self.name,

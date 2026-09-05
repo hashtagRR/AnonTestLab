@@ -38,6 +38,23 @@ def test_index_serves_html():
     assert "AnonTestLab Dashboard" in resp.text
 
 
+def test_index_escapes_baseline_and_experiment_names_before_innerHTML():
+    # Regression guard for a real audit finding: baseline.name (loaded
+    # from whatever YAML a baseline: field points to) used to flow
+    # straight into a compareTable() template string assigned to
+    # innerHTML with no escaping, unlike the top-level experiment name,
+    # which is at least filesystem-safety-checked server-side. A crafted
+    # baseline name like `<img src=x onerror=...>` executed in the
+    # dashboard's origin. This is a structural check (no browser
+    # available in this test suite) that the escaping call sites are
+    # still there, rather than a full DOM/XSS behavioral test.
+    html = client.get("/").text
+    assert "function escapeHtml(" in html
+    assert "<caption>${escapeHtml(name)}</caption>" in html
+    assert "escapeHtml(baseName)" in html
+    assert "escapeHtml(treatName)" in html
+
+
 def test_run_invalid_yaml_returns_400():
     resp = client.post("/api/run", json={"yaml_text": "not: [valid, experiment"})
     assert resp.status_code == 400

@@ -15,6 +15,9 @@ class SessionObservation:
     session_id: int
     ingress_times: list[float] = field(default_factory=list)
     egress_times: list[float] = field(default_factory=list)
+    egress_seq: list[int] = field(default_factory=list)  # real_seq for each egress_times entry,
+    # same index alignment; lets a position-sensitive adversary (watermark) key off true
+    # send order instead of arrival order, which packet loss can desynchronize
 
 
 @dataclass

@@ -245,17 +245,28 @@ async def run_session(
     packets: list[Packet] = []
     pending: dict[tuple[int, int], Packet] = {}
     next_packet_id = 0
+    real_seq_counter = 0  # 1-indexed count of real sends only, matching how the
+    # watermark relay counts real cells reaching it (see relay_process.py);
+    # nothing can be lost between client and hop 1 in this model, so this
+    # stays in lockstep with the relay's own count
 
     async def listen(path_idx: int, circuit: Circuit) -> None:
         try:
             while True:
-                packet_id = await circuit.recv_delivery()
+                packet_id, exit_t = await circuit.recv_delivery()
                 t = time.monotonic() - experiment_start
                 pkt = pending.pop((path_idx, packet_id), None)
                 if pkt is not None:
                     pkt.delivered_at = t
                     if path_idx in observed_exit_indices:
-                        obs.egress_times.append(t)
+                        # exit_t, not t: t is when the confirmation finished
+                        # its own round trip back through every hop (with
+                        # each hop's link conditions applied again on the
+                        # way back), not when the packet actually left the
+                        # exit hop, which is what a passive exit observer
+                        # would actually see.
+                        obs.egress_times.append(exit_t - experiment_start)
+                        obs.egress_seq.append(pkt.real_seq)
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             pass
 
@@ -284,7 +295,16 @@ async def run_session(
         t_send = time.monotonic() - experiment_start
 
         next_packet_id += 1
-        pkt = Packet(packet_id=next_packet_id, session_id=session_id, kind=kind, path=[], created_at=t_send)
+        if kind == "real":
+            real_seq_counter += 1
+        pkt = Packet(
+            packet_id=next_packet_id,
+            session_id=session_id,
+            kind=kind,
+            path=[],
+            created_at=t_send,
+            real_seq=real_seq_counter if kind == "real" else None,
+        )
         packets.append(pkt)
         if kind == "real":
             pending[(path_idx, packet_id)] = pkt

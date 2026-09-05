@@ -20,6 +20,7 @@ import asyncio
 import random
 import struct
 import sys
+import time
 from dataclasses import dataclass, field
 
 from . import crypto_layer, wire
@@ -185,7 +186,14 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
             circuit.downstream_writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit.downstream_cid, inner))
             await circuit.downstream_writer.drain()
         elif kind == wire.KIND_REAL:
-            confirmation = struct.pack(">Q", packet_id)
+            # Timestamped here, at the exit hop, before the confirmation's own
+            # return trip: an adversary watching this hop's outbound wire
+            # traffic would see this moment, not whenever the confirmation
+            # eventually reaches the client (which also picks up every link's
+            # return-leg latency/jitter on top). time.monotonic() is a
+            # system-wide clock on every platform this targets, so it's
+            # directly comparable across the relay and orchestrator processes.
+            confirmation = struct.pack(">Qd", packet_id, time.monotonic())
             sealed = crypto_layer.seal(state.algorithm, circuit.key_back, confirmation, aad=circuit.upstream_cid)
             if not await apply_link_conditions(state, len(sealed)):
                 return

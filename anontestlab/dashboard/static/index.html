@@ -382,18 +382,30 @@ function fmt(v) {
   return String(v);
 }
 
+function escapeHtml(s) {
+  // Experiment names come from user-editable YAML (the submitted config,
+  // and whatever config a baseline: field points to), so they're
+  // untrusted text, not markup, by the time they reach a template
+  // string headed for innerHTML.
+  const div = document.createElement('div');
+  div.textContent = String(s);
+  return div.innerHTML;
+}
+
 function metricsTable(name, metrics) {
   const table = document.createElement('table');
-  table.innerHTML = `<caption>${name}</caption><tr><th>metric</th><th>value</th></tr>` +
+  table.innerHTML = `<caption>${escapeHtml(name)}</caption><tr><th>metric</th><th>value</th></tr>` +
     Object.entries(metrics).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v)}</td></tr>`).join('');
   return table;
 }
 
 function compareTable(baseName, baseMetrics, treatName, treatMetrics) {
   const keys = [...new Set([...Object.keys(baseMetrics), ...Object.keys(treatMetrics)])].sort();
+  const safeBaseName = escapeHtml(baseName);
+  const safeTreatName = escapeHtml(treatName);
   const table = document.createElement('table');
-  table.innerHTML = `<caption>Baseline comparison (${baseName} vs ${treatName})</caption>` +
-    `<tr><th>metric</th><th>${baseName}</th><th>${treatName}</th></tr>` +
+  table.innerHTML = `<caption>Baseline comparison (${safeBaseName} vs ${safeTreatName})</caption>` +
+    `<tr><th>metric</th><th>${safeBaseName}</th><th>${safeTreatName}</th></tr>` +
     keys.map(k => `<tr><td>${k}</td><td>${fmt(baseMetrics[k])}</td><td>${fmt(treatMetrics[k])}</td></tr>`).join('');
   return table;
 }

@@ -140,13 +140,18 @@ class Circuit:
         await self._send_cell(kind, packet_id, chunks[-1])
         return packet_id
 
-    async def recv_delivery(self) -> int:
+    async def recv_delivery(self) -> tuple[int, float]:
+        """Returns (packet_id, exit_t): exit_t is the exit hop's own
+        time.monotonic() reading at the moment it confirmed delivery, not
+        when this confirmation happens to arrive back here (see
+        relay_process.py's KIND_REAL confirmation branch for why that
+        distinction matters for an exit-hop observer)."""
         msg_type, _cid, body = await wire.read_frame(self.reader)
         if msg_type != wire.MSG_RELAY_BACK:
             raise wire.ProtocolError(f"expected RELAY_BACK, got msg_type={msg_type}")
         plaintext = unwrap_backward(self.keys_back, self.circuit_ids, body, self.algorithm)
-        (packet_id,) = struct.unpack(">Q", plaintext)
-        return packet_id
+        packet_id, exit_t = struct.unpack(">Qd", plaintext)
+        return packet_id, exit_t
 
     async def close(self) -> None:
         self.writer.close()

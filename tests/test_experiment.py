@@ -268,11 +268,69 @@ def test_hop_depth_adversary_reports_nan_without_fixed_size_cells():
     assert math.isnan(result.metrics["path_length_leak_at_hop1"])
 
 
+def test_watermark_detection_survives_packet_loss_downstream():
+    # Regression guard for a real audit finding: the watermark adversary
+    # used to infer position from arrival-list index, which packet loss
+    # anywhere downstream of the watermark relay silently desynchronizes
+    # from true send order. This combination (watermark + real loss) was
+    # never exercised end to end before; with real_seq-based detection it
+    # must keep working under actual, non-deterministic loss, not just
+    # the hand-computed synthetic case in test_watermark_adversary.py.
+    result = run_experiment(
+        _small_config(
+            watermark_period=3,
+            watermark_delay_ms=80.0,
+            real_traffic_distribution="constant",
+            real_rate=10.0,
+            link_loss_probability=0.1,
+            duration_s=2.0,
+            grace_period_s=1.5,
+            num_sessions=8,
+            adversaries=["watermark"],
+        )
+    )
+    if result.metrics["watermark_sessions_evaluated"] > 0:
+        assert result.metrics["watermark_detection_rate"] >= 0.5
+
+
 def test_link_latency_increases_measured_latency():
     baseline = run_experiment(_small_config())
     wan = run_experiment(_small_config(link_latency_ms=50.0, link_jitter_ms=5.0, grace_period_s=2.0))
     assert wan.metrics["avg_latency_s"] > baseline.metrics["avg_latency_s"]
     assert wan.metrics["delivery_rate"] == 1.0
+
+
+def test_egress_timestamp_reflects_exit_hop_not_the_confirmation_round_trip():
+    """Regression guard: egress_times must come from the exit hop's own
+    clock at the moment it confirms delivery, not from whenever that
+    confirmation finishes traveling back through every hop to the
+    client. Under real link latency the two are measurably different:
+    the round trip includes 3 more hops of return-leg latency that a
+    passive exit-hop observer would never see."""
+    from anontestlab.emulator.orchestrator import run_experiment as run_emulated
+
+    config = _small_config(
+        path_length=3,
+        link_latency_ms=40.0,
+        num_sessions=1,
+        real_rate=3.0,
+        duration_s=1.0,
+        grace_period_s=1.5,
+    )
+    collector, ctx, _build_delay, _failed = run_emulated(config)
+
+    delivered_real = [p for p in collector.packets if p.kind == "real" and p.delivered]
+    assert delivered_real
+    obs = ctx.sessions[0]
+    assert obs.egress_times
+
+    mean_delivered_at = sum(p.delivered_at for p in delivered_real) / len(delivered_real)
+    mean_egress_t = sum(obs.egress_times) / len(obs.egress_times)
+    # The return leg alone is 3 more hops of ~40ms latency; a generous
+    # (well under that) margin keeps this robust to jitter noise while
+    # still failing if egress ever regresses to being the same clock
+    # reading as delivered_at.
+    assert mean_delivered_at - mean_egress_t > 0.05
 
 
 def test_link_loss_reduces_delivery_without_hanging():
@@ -405,3 +463,31 @@ def test_run_experiment_with_baseline_produces_comparison(tmp_path):
     assert result.baseline_result.metrics["bandwidth_overhead_x"] == 1.0
     assert result.metrics["bandwidth_overhead_x"] > 1.0
     assert "Baseline comparison" in (tmp_path / "out" / "report.md").read_text()
+
+
+def test_baseline_pointing_at_a_config_with_its_own_baseline_is_rejected(tmp_path):
+    # Regression guard: a chained baseline used to recurse with no depth
+    # limit, spawning a real subprocess experiment at every level before
+    # eventually hitting RecursionError. Must now fail fast and clearly
+    # after at most one extra level, before that ever becomes an issue.
+    import pytest
+    import yaml
+
+    root_path = tmp_path / "root.yaml"
+    chained_path = tmp_path / "chained.yaml"
+    root_path.write_text(
+        yaml.safe_dump({"experiment": {"name": "root", "seed": 1, "duration_s": 1.0}})
+    )
+    chained_path.write_text(
+        yaml.safe_dump(
+            {
+                "experiment": {"name": "chained", "seed": 1, "duration_s": 1.0},
+                "baseline": str(root_path),
+            }
+        )
+    )
+
+    treatment = _small_config()
+    treatment.baseline = str(chained_path)
+    with pytest.raises(ValueError, match="baseline chains aren't supported"):
+        run_experiment(treatment)

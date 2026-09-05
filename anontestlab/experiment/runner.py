@@ -22,6 +22,7 @@ def run_experiment(
     config: ExperimentConfig,
     out_dir: Path | None = None,
     on_progress: Callable[[dict], None] | None = None,
+    _baseline_depth: int = 0,
 ) -> ExperimentResult:
     config.validate()
     collector, ctx, avg_build_delay, sessions_failed = run_emulated_experiment(config, on_progress)
@@ -38,8 +39,14 @@ def run_experiment(
 
     baseline_result = None
     if config.baseline:
+        if _baseline_depth >= 1:
+            raise ValueError(
+                f"baseline chains aren't supported: {config.name!r} was reached as a baseline "
+                f"and itself sets baseline: {config.baseline!r}. Point a baseline directly at a "
+                "config that has no baseline of its own."
+            )
         baseline_config = ExperimentConfig.from_yaml(config.baseline)
-        baseline_result = run_experiment(baseline_config)  # baseline configs aren't expected to chain
+        baseline_result = run_experiment(baseline_config, _baseline_depth=_baseline_depth + 1)
 
     result = ExperimentResult(config=config, metrics=metrics, baseline_result=baseline_result)
     if out_dir is not None:
