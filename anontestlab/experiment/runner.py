@@ -15,7 +15,7 @@ from .config import ExperimentConfig
 class ExperimentResult:
     config: ExperimentConfig
     metrics: dict[str, float]
-    baseline_result: "ExperimentResult | None" = None
+    baseline_result: ExperimentResult | None = None
 
 
 def run_experiment(

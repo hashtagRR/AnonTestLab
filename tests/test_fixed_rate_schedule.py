@@ -7,7 +7,7 @@ from anontestlab.experiment.config import ExperimentConfig
 
 
 def _config(**overrides):
-    base = dict(name="t", fixed_rate=10.0, duration_s=1.0)
+    base = {"name": "t", "fixed_rate": 10.0, "duration_s": 1.0}
     base.update(overrides)
     return ExperimentConfig(**base)
 

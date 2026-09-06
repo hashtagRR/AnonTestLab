@@ -6,7 +6,7 @@ from anontestlab.experiment.config import ExperimentConfig, PathSpec
 
 
 def _config(**overrides) -> ExperimentConfig:
-    base = dict(name="t")
+    base = {"name": "t"}
     base.update(overrides)
     return ExperimentConfig(**base)
 

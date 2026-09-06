@@ -4,13 +4,13 @@ from .runner import ExperimentResult, run_experiment, write_results
 from .sweep import SweepResult, run_sweep
 
 __all__ = [
-    "ExperimentConfig",
-    "PathSpec",
-    "ExperimentResult",
-    "run_experiment",
-    "write_results",
     "ComparisonResult",
-    "compare_experiments",
+    "ExperimentConfig",
+    "ExperimentResult",
+    "PathSpec",
     "SweepResult",
+    "compare_experiments",
+    "run_experiment",
     "run_sweep",
+    "write_results",
 ]

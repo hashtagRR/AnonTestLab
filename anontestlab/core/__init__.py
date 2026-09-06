@@ -1,4 +1,4 @@
-from .simulation import Simulation
 from .packet import Packet
+from .simulation import Simulation
 
-__all__ = ["Simulation", "Packet"]
+__all__ = ["Packet", "Simulation"]

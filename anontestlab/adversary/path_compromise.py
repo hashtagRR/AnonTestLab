@@ -23,7 +23,7 @@ class PathCompromiseAdversary(Adversary):
         self.trials = trials
 
     @classmethod
-    def from_config(cls, config) -> "PathCompromiseAdversary":
+    def from_config(cls, config) -> PathCompromiseAdversary:
         return cls(compromised_fraction=config.compromised_fraction, trials=config.compromise_trials)
 
     def attack(self, ctx: SimulationContext, rng: random.Random) -> AdversaryResult:

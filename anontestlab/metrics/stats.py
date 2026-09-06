@@ -38,7 +38,7 @@ def tpr_at_fpr(
         if n_impostor == 0:
             result[fpr] = float("nan")
             continue
-        k = max(1, int(round(fpr * n_impostor)))
+        k = max(1, round(fpr * n_impostor))
         k = min(k, n_impostor)
         threshold = impostor[k - 1]
         tpr = float(np.mean(true >= threshold)) if len(true) else float("nan")

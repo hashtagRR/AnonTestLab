@@ -1,6 +1,6 @@
+from .bandwidth_weighted import BandwidthWeightedRouting
 from .base import RoutingStrategy
 from .random_path import RandomPathRouting
-from .bandwidth_weighted import BandwidthWeightedRouting
 
 STRATEGIES: dict[str, type[RoutingStrategy]] = {
     "random": RandomPathRouting,
@@ -18,9 +18,9 @@ def get_strategy(name: str) -> RoutingStrategy:
 
 
 __all__ = [
-    "RoutingStrategy",
-    "RandomPathRouting",
-    "BandwidthWeightedRouting",
     "STRATEGIES",
+    "BandwidthWeightedRouting",
+    "RandomPathRouting",
+    "RoutingStrategy",
     "get_strategy",
 ]

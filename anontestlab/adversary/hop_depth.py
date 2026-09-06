@@ -31,7 +31,7 @@ class HopDepthAdversary(Adversary):
         self.algorithm = algorithm
 
     @classmethod
-    def from_config(cls, config) -> "HopDepthAdversary":
+    def from_config(cls, config) -> HopDepthAdversary:
         return cls(cell_size=config.cell_size, algorithm=config.crypto_algorithm)
 
     def _hop_size(self, position: int) -> int:
@@ -63,7 +63,8 @@ class HopDepthAdversary(Adversary):
 
         hop_position_accuracy = correct / total if total else float("nan")
 
-        if len(lengths_seen) < 2:
+        if len(lengths_seen) < 2:  # noqa: SIM108 - each branch carries its own
+            # rationale below; collapsing to a ternary would lose that.
             # Only one circuit length appears in this experiment, so
             # there's nothing to distinguish between; not measurable here.
             path_length_leak = float("nan")

@@ -79,6 +79,9 @@ class RunTracker:
 
 
 tracker = RunTracker()
+_background_task: asyncio.Task | None = None  # keeps the run_in_background()
+# task referenced so asyncio can't garbage-collect it mid-run; only one run
+# is ever in flight (tracker enforces that), so a single slot is enough.
 
 
 def _sanitize(metrics: dict[str, Any]) -> dict[str, Any]:
@@ -116,8 +119,10 @@ async def api_run(req: RunRequest) -> dict[str, Any]:
         tmp_path = f.name
     try:
         config = ExperimentConfig.from_yaml(tmp_path)
+    # Untrusted user YAML: any parse/validation failure must become a
+    # clean 400, not an unhandled 500.
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid experiment YAML: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid experiment YAML: {e}") from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
@@ -137,10 +142,14 @@ async def api_run(req: RunRequest) -> dict[str, Any]:
         try:
             result = await asyncio.to_thread(run_experiment, config, out_dir, tracker.add_event)
             tracker.finish(result=_result_payload(config.name, out_dir, result))
-        except Exception as e:
+        # A failure anywhere in a real subprocess-based experiment run must
+        # reach the tracker as a reported error, not crash this background
+        # task silently, so this really does need to be Exception.
+        except Exception as e:  # noqa: BLE001
             tracker.finish(error=str(e))
 
-    asyncio.create_task(run_in_background())
+    global _background_task
+    _background_task = asyncio.create_task(run_in_background())
     return {"started": True, "name": config.name}
 
 

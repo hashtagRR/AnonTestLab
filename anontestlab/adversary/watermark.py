@@ -36,7 +36,7 @@ class WatermarkAdversary(Adversary):
         self.detection_fraction = detection_fraction
 
     @classmethod
-    def from_config(cls, config) -> "WatermarkAdversary":
+    def from_config(cls, config) -> WatermarkAdversary:
         return cls(period=config.watermark_period, delay_s=config.watermark_delay_ms / 1000.0)
 
     def attack(self, ctx: SimulationContext, rng: random.Random) -> AdversaryResult:

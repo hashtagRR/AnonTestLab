@@ -31,7 +31,7 @@ class GlobalPassiveObserver(Adversary):
         self.fpr_targets = fpr_targets
 
     @classmethod
-    def from_config(cls, config) -> "GlobalPassiveObserver":
+    def from_config(cls, config) -> GlobalPassiveObserver:
         return cls(
             bin_size=getattr(config, "observer_bin_width_ms", 50.0) / 1000.0,
             classifier=getattr(config, "observer_classifier", "pearson"),

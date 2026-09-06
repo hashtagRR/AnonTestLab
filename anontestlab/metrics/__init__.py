@@ -1,10 +1,10 @@
-from .stats import wilson_ci, tpr_at_fpr, roc_auc, precision_recall_at_threshold
 from .collector import MetricsCollector
+from .stats import precision_recall_at_threshold, roc_auc, tpr_at_fpr, wilson_ci
 
 __all__ = [
-    "wilson_ci",
-    "tpr_at_fpr",
-    "roc_auc",
-    "precision_recall_at_threshold",
     "MetricsCollector",
+    "precision_recall_at_threshold",
+    "roc_auc",
+    "tpr_at_fpr",
+    "wilson_ci",
 ]

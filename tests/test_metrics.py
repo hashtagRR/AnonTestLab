@@ -1,4 +1,9 @@
-from anontestlab.metrics.stats import wilson_ci, tpr_at_fpr, roc_auc, precision_recall_at_threshold
+from anontestlab.metrics.stats import (
+    precision_recall_at_threshold,
+    roc_auc,
+    tpr_at_fpr,
+    wilson_ci,
+)
 
 
 def test_wilson_ci_zero_n():

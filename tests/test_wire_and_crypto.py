@@ -7,9 +7,15 @@ import asyncio
 import struct
 
 import pytest
+from cryptography.exceptions import InvalidTag
 
 from anontestlab.emulator import crypto_layer, wire
-from anontestlab.emulator.circuit_client import Circuit, pad_to_cell_size, unwrap_backward, wrap_layers
+from anontestlab.emulator.circuit_client import (
+    Circuit,
+    pad_to_cell_size,
+    unwrap_backward,
+    wrap_layers,
+)
 
 
 def test_pack_unpack_extend_roundtrip():
@@ -75,16 +81,16 @@ def test_ecdh_handshake_derives_matching_keys(keyexchange):
 def test_forward_and_backward_keys_are_independent():
     """Reusing one key both directions would be a protocol weakness, not
     just a missed optimization: confirm they're genuinely different."""
-    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
-    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
+    priv_a, _pub_a = crypto_layer.generate_ephemeral_keypair()
+    _priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
     key_fwd, key_back = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm")
     assert key_fwd != key_back
 
 
 @pytest.mark.parametrize("algorithm,expected_len", [("aes128gcm", 16), ("aes256gcm", 32)])
 def test_derive_key_length_matches_algorithm(algorithm, expected_len):
-    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair()
-    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
+    priv_a, _pub_a = crypto_layer.generate_ephemeral_keypair()
+    _priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
     key_fwd, key_back = crypto_layer.derive_key(priv_a, pub_b, algorithm)
     assert len(key_fwd) == expected_len
     assert len(key_back) == expected_len
@@ -95,8 +101,8 @@ def test_mismatched_keyexchange_between_peers_fails_or_mismatches():
     whole-experiment setting), so this is a configuration error to avoid,
     not something the protocol detects. Guard that it fails loudly (wrong
     key size for that curve) rather than silently deriving usable keys."""
-    priv_a, pub_a = crypto_layer.generate_ephemeral_keypair("x25519")
-    priv_b, pub_b = crypto_layer.generate_ephemeral_keypair("x448")
+    priv_a, _pub_a = crypto_layer.generate_ephemeral_keypair("x25519")
+    _priv_b, pub_b = crypto_layer.generate_ephemeral_keypair("x448")
     with pytest.raises(ValueError):
         crypto_layer.derive_key(priv_a, pub_b, "aes256gcm", "x25519")
 
@@ -165,7 +171,7 @@ def test_backward_layers_cannot_be_read_with_only_the_deepest_hops_key():
     cids = [b"11111111", b"22222222", b"33333333"]
     sealed = _seal_backward_through_hops(keys_back, cids, struct.pack(">Q", 42))
 
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidTag):
         crypto_layer.open_sealed("aes256gcm", keys_back[2], sealed, aad=cids[2])
 
 
@@ -180,7 +186,7 @@ def test_wrap_layers_rejects_wrong_hop_local_circuit_id():
     layer1 = crypto_layer.open_sealed("aes256gcm", keys[0], sealed, aad=cids[0])
     _kind, _pid, inner1 = wire.unpack_data(layer1)
 
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidTag):
         crypto_layer.open_sealed("aes256gcm", keys[1], inner1, aad=cids[0])  # wrong AAD
 
 

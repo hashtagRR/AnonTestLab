@@ -145,7 +145,7 @@ async def spawn_relays(
             line = await asyncio.wait_for(h.process.stdout.readline(), timeout=READY_TIMEOUT_S)
         except asyncio.TimeoutError:
             await terminate_relays(handles)
-            raise RuntimeError(f"relay {h.node_id} on port {h.port} did not start in time")
+            raise RuntimeError(f"relay {h.node_id} on port {h.port} did not start in time") from None
         if not line.startswith(b"READY"):
             stderr = (await h.process.stderr.read()).decode(errors="replace")
             await terminate_relays(handles)
@@ -294,7 +294,7 @@ async def run_session(
         )
         t_send = time.monotonic() - experiment_start
 
-        next_packet_id += 1
+        next_packet_id += 1  # noqa: SIM113 - a Packet.packet_id counter, not this loop's index
         if kind == "real":
             real_seq_counter += 1
         pkt = Packet(

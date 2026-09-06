@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the declared floor (requires-python in pyproject.toml);
+        # 3.11/3.12 are what INSTALL.md recommends. ubuntu-latest only:
+        # the emulator binds relay processes across 127.0.0.0/8, which
+        # needs no extra setup on Linux, unlike macOS (needs `ifconfig
+        # lo0 alias`) or Windows (never verified against a live run).
+        python-version: ["3.9", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install -e ".[dev,dashboard]"
+
+      - name: Test
+        run: pytest -q
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .

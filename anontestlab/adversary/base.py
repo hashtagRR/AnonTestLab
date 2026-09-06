@@ -43,7 +43,7 @@ class Adversary(ABC):
     name: str = "base"
 
     @classmethod
-    def from_config(cls, config) -> "Adversary":
+    def from_config(cls, config) -> Adversary:
         return cls()
 
     @abstractmethod

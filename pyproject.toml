@@ -18,7 +18,7 @@ dependencies = [
 atl = "anontestlab.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "ruff>=0.11"]
 dashboard = ["fastapi>=0.100", "uvicorn>=0.23", "httpx2"]
 
 [build-system]
@@ -27,3 +27,12 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["anontestlab*"]
+
+[tool.ruff]
+target-version = "py39"  # matches requires-python: keeps pyupgrade suggestions
+# from assuming syntax (e.g. the 3.10+ `X | Y` union operator at runtime)
+# that isn't safe on the floor this project declares support for.
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "BLE", "RUF"]

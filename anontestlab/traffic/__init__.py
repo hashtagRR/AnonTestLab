@@ -1,4 +1,9 @@
-from .generators import TrafficGenerator, PoissonTraffic, ConstantRateTraffic, ParetoTraffic
+from .generators import (
+    ConstantRateTraffic,
+    ParetoTraffic,
+    PoissonTraffic,
+    TrafficGenerator,
+)
 
 GENERATORS: dict[str, type[TrafficGenerator]] = {
     "poisson": PoissonTraffic,
@@ -17,10 +22,10 @@ def get_generator(name: str, rate: float) -> TrafficGenerator:
 
 
 __all__ = [
-    "TrafficGenerator",
-    "PoissonTraffic",
+    "GENERATORS",
     "ConstantRateTraffic",
     "ParetoTraffic",
-    "GENERATORS",
+    "PoissonTraffic",
+    "TrafficGenerator",
     "get_generator",
 ]

@@ -3,7 +3,11 @@ from collections import Counter
 
 import pytest
 
-from anontestlab.routing import BandwidthWeightedRouting, RandomPathRouting, get_strategy
+from anontestlab.routing import (
+    BandwidthWeightedRouting,
+    RandomPathRouting,
+    get_strategy,
+)
 
 
 def test_random_path_selects_distinct_nodes():
@@ -30,7 +34,7 @@ def test_bandwidth_weighted_selects_distinct_nodes():
     rng = random.Random(1)
     routing = BandwidthWeightedRouting()
     node_ids = [f"n{i}" for i in range(10)]
-    weights = {n: 1.0 for n in node_ids}
+    weights = dict.fromkeys(node_ids, 1.0)
     path = routing.select_path(node_ids, rng, 3, weights)
     assert len(path) == 3
     assert len(set(path)) == 3

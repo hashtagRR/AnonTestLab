@@ -3,25 +3,30 @@ subprocesses on real localhost ports, so they're slower than unit tests
 (seconds, not milliseconds). Kept fast by using short durations/small
 networks, not by faking anything."""
 
-from anontestlab.experiment import ExperimentConfig, compare_experiments, run_experiment, run_sweep
+from anontestlab.experiment import (
+    ExperimentConfig,
+    compare_experiments,
+    run_experiment,
+    run_sweep,
+)
 from anontestlab.experiment.config import PathSpec
 
 
 def _small_config(**overrides) -> ExperimentConfig:
-    base = dict(
-        name="test-experiment",
-        seed=42,
-        duration_s=1.0,
-        grace_period_s=0.8,
-        num_nodes=5,
-        num_sessions=2,
-        routing_strategy="random",
-        path_length=2,
-        real_rate=4.0,
-        cover_rate=0.0,
-        crypto_algorithm="aes256gcm",
-        adversaries=["global_observer"],
-    )
+    base = {
+        "name": "test-experiment",
+        "seed": 42,
+        "duration_s": 1.0,
+        "grace_period_s": 0.8,
+        "num_nodes": 5,
+        "num_sessions": 2,
+        "routing_strategy": "random",
+        "path_length": 2,
+        "real_rate": 4.0,
+        "cover_rate": 0.0,
+        "crypto_algorithm": "aes256gcm",
+        "adversaries": ["global_observer"],
+    }
     base.update(overrides)
     return ExperimentConfig(**base)
 
@@ -197,7 +202,7 @@ def test_compare_experiments_reports_deltas(tmp_path):
     config_a = _small_config(name="a", cover_rate=0.0)
     config_b = _small_config(name="b", cover_rate=8.0)
     comparison = compare_experiments(config_a, config_b, out_dir=tmp_path / "cmp")
-    rows = dict((k, (a, b, d)) for k, a, b, d in comparison.rows())
+    rows = {k: (a, b, d) for k, a, b, d in comparison.rows()}
     assert rows["bandwidth_overhead_x"][1] > rows["bandwidth_overhead_x"][0]
     assert (tmp_path / "cmp" / "comparison.csv").exists()
     assert (tmp_path / "cmp" / "comparison.md").exists()

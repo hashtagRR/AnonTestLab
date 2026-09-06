@@ -6,7 +6,12 @@ transport cost from crypto cost in benchmarks).
 """
 from __future__ import annotations
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM, AESGCMSIV, AESOCB3, ChaCha20Poly1305
+from cryptography.hazmat.primitives.ciphers.aead import (
+    AESGCM,
+    AESGCMSIV,
+    AESOCB3,
+    ChaCha20Poly1305,
+)
 
 NONCE_LEN = 12
 

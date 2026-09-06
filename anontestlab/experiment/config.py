@@ -91,7 +91,7 @@ class ExperimentConfig:
 
     @property
     def paths(self) -> list[PathSpec]:
-        return [PathSpec(self.routing_strategy, self.path_length)] + list(self.extra_paths)
+        return [PathSpec(self.routing_strategy, self.path_length), *self.extra_paths]
 
     @property
     def num_paths(self) -> int:
@@ -161,9 +161,15 @@ class ExperimentConfig:
                 )
         check(self.num_as_groups > 0, f"num_as_groups must be positive, got {self.num_as_groups}")
         if self.observed_path_count is not None:
-            check(self.observed_path_count > 0, f"observed_path_count must be positive if set, got {self.observed_path_count}")
+            check(
+                self.observed_path_count > 0,
+                f"observed_path_count must be positive if set, got {self.observed_path_count}",
+            )
         if self.observed_as_count is not None:
-            check(self.observed_as_count > 0, f"observed_as_count must be positive if set, got {self.observed_as_count}")
+            check(
+                self.observed_as_count > 0,
+                f"observed_as_count must be positive if set, got {self.observed_as_count}",
+            )
         check(
             0 <= self.compromised_fraction <= 1,
             f"compromised_fraction must be in [0, 1], got {self.compromised_fraction}",
@@ -177,7 +183,10 @@ class ExperimentConfig:
             f"link_loss_probability must be in [0, 1], got {self.link_loss_probability}",
         )
         if self.link_bandwidth_kbps is not None:
-            check(self.link_bandwidth_kbps > 0, f"link_bandwidth_kbps must be positive if set, got {self.link_bandwidth_kbps}")
+            check(
+                self.link_bandwidth_kbps > 0,
+                f"link_bandwidth_kbps must be positive if set, got {self.link_bandwidth_kbps}",
+            )
         check(
             0 <= self.link_heterogeneity_spread < 1,
             f"link_heterogeneity_spread must be in [0, 1), got {self.link_heterogeneity_spread}",
@@ -187,21 +196,21 @@ class ExperimentConfig:
             raise ValueError("invalid experiment config:\n  - " + "\n  - ".join(errors))
 
     @classmethod
-    def tor_like(cls, name: str, **overrides) -> "ExperimentConfig":
-        base = dict(
-            name=name,
-            mode="tor_like",
-            routing_strategy="random",
-            path_length=3,
-            extra_paths=[],
-            cover_rate=0.0,
-            cover_drop_probability=0.0,
-        )
+    def tor_like(cls, name: str, **overrides) -> ExperimentConfig:
+        base = {
+            "name": name,
+            "mode": "tor_like",
+            "routing_strategy": "random",
+            "path_length": 3,
+            "extra_paths": [],
+            "cover_rate": 0.0,
+            "cover_drop_probability": 0.0,
+        }
         base.update(overrides)
         return cls(**base)
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "ExperimentConfig":
+    def from_yaml(cls, path: str | Path) -> ExperimentConfig:
         raw = yaml.safe_load(Path(path).read_text())
         exp = raw.get("experiment", {})
         network = raw.get("network", {})

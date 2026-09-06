@@ -43,7 +43,8 @@ class BandwidthWeightedRouting(RoutingStrategy):
                 break
             pick = rng.uniform(0, total)
             acc = 0.0
-            for i, w in enumerate(remaining_weights):
+            for i, w in enumerate(remaining_weights):  # noqa: B007 - i is used below,
+                # just after the loop rather than inside its body
                 acc += w
                 if pick <= acc:
                     break

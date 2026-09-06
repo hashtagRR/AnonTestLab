@@ -1,7 +1,7 @@
 import random
 import statistics
 
-from anontestlab.traffic import PoissonTraffic, ConstantRateTraffic, ParetoTraffic
+from anontestlab.traffic import ConstantRateTraffic, ParetoTraffic, PoissonTraffic
 
 
 def test_poisson_traffic_stays_within_duration():

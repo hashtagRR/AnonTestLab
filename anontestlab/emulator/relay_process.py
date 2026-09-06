@@ -36,6 +36,8 @@ class CircuitState:
     downstream_cid: bytes | None = None
     downstream_edge_factor: float = 1.0  # this hop's own per-edge scale toward its downstream peer
     real_packet_count: int = 0
+    backward_task: asyncio.Task | None = None  # keeps forward_downstream_to_upstream
+    # referenced for the circuit's lifetime so asyncio can't garbage-collect it mid-run
 
 
 @dataclass
@@ -161,7 +163,7 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
         circuit.downstream_writer = d_writer
         circuit.downstream_cid = next_circuit_id
         circuit.downstream_edge_factor = factor
-        asyncio.create_task(forward_downstream_to_upstream(_d_reader, circuit, state))
+        circuit.backward_task = asyncio.create_task(forward_downstream_to_upstream(_d_reader, circuit, state))
         sealed_pub = crypto_layer.seal(state.algorithm, circuit.key_back, server_pub, aad=circuit.upstream_cid)
         if await apply_link_conditions(state, len(sealed_pub)):
             circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed_pub))
