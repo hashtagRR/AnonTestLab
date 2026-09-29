@@ -24,6 +24,7 @@ import time
 from dataclasses import dataclass, field
 
 from . import crypto_layer, wire
+from .mixing import Mixer
 
 
 @dataclass
@@ -55,6 +56,7 @@ class RelayState:
     link_jitter_s: float = 0.0
     link_loss_probability: float = 0.0
     link_bandwidth_kbps: float | None = None  # None = unlimited
+    mixer: Mixer = field(default_factory=Mixer)  # relay-wide, shared by every circuit (see mixing.py)
     circuits: dict[bytes, CircuitState] = field(default_factory=dict)
 
 
@@ -172,6 +174,8 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
 
     if ctype == wire.CELL_DATA:
         kind, packet_id, inner = wire.unpack_data(plaintext)
+        if kind == wire.KIND_COVER_TERMINATE:
+            return  # random-hop cover drop: this hop is the one chosen to absorb it
         if circuit.downstream_writer is not None:
             if (
                 kind == wire.KIND_COVER
@@ -183,10 +187,19 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
                 circuit.real_packet_count += 1
                 if circuit.real_packet_count % state.watermark_period == 0:
                     await asyncio.sleep(state.watermark_delay_s)
-            if not await apply_link_conditions(state, len(inner), circuit.downstream_edge_factor):
-                return  # lost on this hop's outbound link
-            circuit.downstream_writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit.downstream_cid, inner))
-            await circuit.downstream_writer.drain()
+
+            async def forward() -> None:
+                if not await apply_link_conditions(state, len(inner), circuit.downstream_edge_factor):
+                    return  # lost on this hop's outbound link
+                circuit.downstream_writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, circuit.downstream_cid, inner))
+                await circuit.downstream_writer.drain()
+
+            # EXTEND cells in transit (KIND_CONTROL) bypass the mix, which
+            # applies to data-phase forwarding only.
+            if kind == wire.KIND_CONTROL:
+                await forward()
+            else:
+                await state.mixer.submit(forward)
         elif kind == wire.KIND_REAL:
             # Timestamped here, at the exit hop, before the confirmation's own
             # return trip: an adversary watching this hop's outbound wire
@@ -195,12 +208,19 @@ async def process_relay_fwd(state: RelayState, circuit: CircuitState, plaintext:
             # return-leg latency/jitter on top). time.monotonic() is a
             # system-wide clock on every platform this targets, so it's
             # directly comparable across the relay and orchestrator processes.
-            confirmation = struct.pack(">Qd", packet_id, time.monotonic())
-            sealed = crypto_layer.seal(state.algorithm, circuit.key_back, confirmation, aad=circuit.upstream_cid)
-            if not await apply_link_conditions(state, len(sealed)):
-                return
-            circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed))
-            await circuit.upstream_writer.drain()
+            #
+            # The exit is a mix like every other hop, so the cell first waits
+            # out this hop's mixing and the timestamp marks when it actually
+            # leaves.
+            async def emit() -> None:
+                confirmation = struct.pack(">Qd", packet_id, time.monotonic())
+                sealed = crypto_layer.seal(state.algorithm, circuit.key_back, confirmation, aad=circuit.upstream_cid)
+                if not await apply_link_conditions(state, len(sealed)):
+                    return
+                circuit.upstream_writer.write(wire.pack_frame(wire.MSG_RELAY_BACK, circuit.upstream_cid, sealed))
+                await circuit.upstream_writer.drain()
+
+            await state.mixer.submit(emit)
         # cover packet, or a non-final fragment (KIND_REAL_FRAGMENT) of a
         # multi-cell real payload, at the terminal hop: silently absorbed,
         # no confirmation. Only the final fragment arrives as plain
@@ -255,6 +275,7 @@ async def run_relay(
     per_edge: bool = False,
     link_seed: int = 0,
     link_heterogeneity_spread: float = 0.5,
+    mixer: Mixer | None = None,
 ) -> None:
     state = RelayState(
         algorithm=algorithm,
@@ -270,6 +291,7 @@ async def run_relay(
         link_jitter_s=link_jitter_s,
         link_loss_probability=link_loss_probability,
         link_bandwidth_kbps=link_bandwidth_kbps,
+        mixer=mixer if mixer is not None else Mixer(),
     )
     server = await asyncio.start_server(
         lambda r, w: handle_connection(r, w, state), host=host, port=port
@@ -296,7 +318,21 @@ def main() -> None:
     parser.add_argument("--per-edge", action="store_true")
     parser.add_argument("--link-seed", type=int, default=0)
     parser.add_argument("--link-heterogeneity-spread", type=float, default=0.5)
+    parser.add_argument("--mix-strategy", type=str, default="none")
+    parser.add_argument("--mix-delay-ms", type=float, default=0.0)
+    parser.add_argument("--pool-interval-ms", type=float, default=100.0)
+    parser.add_argument("--pool-release-probability", type=float, default=1.0)
+    parser.add_argument("--pool-interval-jitter", type=float, default=0.0)
+    parser.add_argument("--mix-seed", type=int, default=None)
     args = parser.parse_args()
+    mixer = Mixer(
+        args.mix_strategy,
+        delay_s=args.mix_delay_ms / 1000.0,
+        interval_s=args.pool_interval_ms / 1000.0,
+        release_probability=args.pool_release_probability,
+        interval_jitter=args.pool_interval_jitter,
+        rng=random.Random(args.mix_seed),
+    )
     try:
         asyncio.run(
             run_relay(
@@ -315,6 +351,7 @@ def main() -> None:
                 args.per_edge,
                 args.link_seed,
                 args.link_heterogeneity_spread,
+                mixer,
             )
         )
     except KeyboardInterrupt:

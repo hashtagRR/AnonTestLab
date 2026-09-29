@@ -14,6 +14,7 @@ class Packet:
     path: list[str]
     created_at: float
     delivered_at: float | None = None
+    exit_at: float | None = None  # when the exit hop released it (one-way delay = exit_at - created_at)
     real_seq: int | None = None  # 1-indexed position among this circuit's real sends,
     # independent of cover traffic; used to align with the watermark relay's own count
 

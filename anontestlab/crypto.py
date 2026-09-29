@@ -1,6 +1,6 @@
 """Selectable AEAD algorithms for the per-hop encryption layer.
 
-Real per-hop symmetric encryption, not a modeled cost. `none` is a
+Per-hop symmetric encryption, executed for real so its cost is measured. `none` is a
 plaintext passthrough (still real framing/transport, useful for isolating
 transport cost from crypto cost in benchmarks).
 """

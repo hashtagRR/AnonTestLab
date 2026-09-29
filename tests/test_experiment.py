@@ -1,12 +1,13 @@
 """Integration tests against the real emulator: these spawn real relay
 subprocesses on real localhost ports, so they're slower than unit tests
-(seconds, not milliseconds). Kept fast by using short durations/small
-networks, not by faking anything."""
+(seconds each). They stay fast through short durations and small
+networks, with nothing mocked."""
 
 from anontestlab.experiment import (
     ExperimentConfig,
     compare_experiments,
     run_experiment,
+    run_paired,
     run_sweep,
 )
 from anontestlab.experiment.config import PathSpec
@@ -186,8 +187,8 @@ def test_path_compromise_adversary_full_fraction_means_near_certain_compromise()
         _small_config(adversaries=["path_compromise"], compromised_fraction=1.0, compromise_trials=200)
     )
     # Wilson-center, not the raw proportion, so it's pulled slightly off
-    # the 1.0 boundary even when every trial was a "success". That's
-    # correct Wilson behavior, not a bug.
+    # the 1.0 boundary even when every trial was a "success", which is
+    # correct Wilson behavior.
     assert result.metrics["full_compromise_rate"] > 0.98
 
 
@@ -279,13 +280,12 @@ def test_watermark_detection_survives_packet_loss_downstream():
     # anywhere downstream of the watermark relay silently desynchronizes
     # from true send order. This combination (watermark + real loss) was
     # never exercised end to end before; with real_seq-based detection it
-    # must keep working under actual, non-deterministic loss, not just
+    # must keep working under non-deterministic loss as well as in
     # the hand-computed synthetic case in test_watermark_adversary.py.
     # Per-relay loss rolls are independent random state in each subprocess
     # (not seeded), so a generous session count and threshold keep this
-    # robust to run-to-run noise without weakening what it's actually
-    # checking: a broken (index-based) detector would score far below
-    # this on the same data, not just slightly under it.
+    # stable under run-to-run noise without weakening the check: a broken
+    # (index-based) detector would score far below this on the same data.
     result = run_experiment(
         _small_config(
             watermark_period=3,
@@ -337,7 +337,7 @@ def test_egress_timestamp_reflects_exit_hop_not_the_confirmation_round_trip():
     mean_delivered_at = sum(p.delivered_at for p in delivered_real) / len(delivered_real)
     mean_egress_t = sum(obs.egress_times) / len(obs.egress_times)
     # The return leg alone is 3 more hops of ~40ms latency; a generous
-    # (well under that) margin keeps this robust to jitter noise while
+    # (well under that) margin keeps this stable under jitter noise while
     # still failing if egress ever regresses to being the same clock
     # reading as delivered_at.
     assert mean_delivered_at - mean_egress_t > 0.05
@@ -501,3 +501,20 @@ def test_baseline_pointing_at_a_config_with_its_own_baseline_is_rejected(tmp_pat
     treatment.baseline = str(chained_path)
     with pytest.raises(ValueError, match="baseline chains aren't supported"):
         run_experiment(treatment)
+
+
+def test_paired_runs_both_configs_per_seed():
+    ref = _small_config(name="ref", num_sessions=3)
+    treat = _small_config(name="treat", num_sessions=3)
+    result = run_paired(ref, treat, seeds=[1, 2], metric="delivery_rate", resamples=200)
+    assert result.seeds == [1, 2]
+    assert result.reference_values == [1.0, 1.0]
+    assert result.treatment_values == [1.0, 1.0]
+    assert result.effect.classification == "no_meaningful_effect"
+
+
+def test_held_out_calibration_reports_realized_fpr():
+    result = run_experiment(_small_config(num_sessions=6, observer_calibration_fraction=0.5))
+    m = result.metrics
+    assert m["calibration_sessions"] + m["test_sessions"] == 6
+    assert "realized_fpr_0.1" in m and "fpr_support_0.1" in m

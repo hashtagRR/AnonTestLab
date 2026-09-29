@@ -18,6 +18,7 @@ class SessionObservation:
     egress_seq: list[int] = field(default_factory=list)  # real_seq for each egress_times entry,
     # same index alignment; lets a position-sensitive adversary (watermark) key off true
     # send order instead of arrival order, which packet loss can desynchronize
+    leg_real_counts: list[int] = field(default_factory=list)  # real cells sent on each leg (path index)
 
 
 @dataclass
@@ -37,6 +38,7 @@ class AdversaryResult:
     name: str
     n_sessions: int
     metrics: dict[str, float]
+    artifacts: dict[str, object] = field(default_factory=dict)  # arrays saved next to the metrics (e.g. score matrices)
 
 
 class Adversary(ABC):
