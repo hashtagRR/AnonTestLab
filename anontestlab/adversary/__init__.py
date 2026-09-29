@@ -1,4 +1,5 @@
 from .base import Adversary, AdversaryResult, SessionObservation, SimulationContext
+from .correlation_suite import CorrelationSuite
 from .global_observer import GlobalPassiveObserver
 from .hop_depth import HopDepthAdversary
 from .path_compromise import PathCompromiseAdversary
@@ -6,6 +7,7 @@ from .watermark import WatermarkAdversary
 
 ADVERSARIES: dict[str, type[Adversary]] = {
     "global_observer": GlobalPassiveObserver,
+    "correlation_suite": CorrelationSuite,
     "path_compromise": PathCompromiseAdversary,
     "watermark": WatermarkAdversary,
     "hop_depth": HopDepthAdversary,
@@ -25,6 +27,7 @@ __all__ = [
     "ADVERSARIES",
     "Adversary",
     "AdversaryResult",
+    "CorrelationSuite",
     "GlobalPassiveObserver",
     "HopDepthAdversary",
     "PathCompromiseAdversary",

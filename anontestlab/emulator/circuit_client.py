@@ -17,6 +17,7 @@ def wrap_layers(
     algorithm: str,
     kind: int = wire.KIND_CONTROL,
     packet_id: int = 0,
+    terminate_at: int | None = None,
 ) -> bytes:
     """Build the onion for a cell addressed to the *deepest* established
     hop (`target_cell`, a raw EXTEND or DATA cell, whatever that hop
@@ -33,11 +34,17 @@ def wrap_layers(
     that hop will actually see on its own connection (hop-local IDs, not
     one ID shared across the whole path), so `circuit_ids_in_order` must
     line up index-for-index with `keys_in_order`.
+
+    terminate_at, if given, is the index of an intermediate hop whose own
+    layer is marked KIND_COVER_TERMINATE instead of `kind`, so that hop
+    absorbs the cell (random-hop cover drop). The deepest hop needs no
+    mark: it's already the terminus.
     """
     *intermediate, (last_key, last_cid) = zip(keys_in_order, circuit_ids_in_order)
     layer = crypto_layer.seal(algorithm, last_key, target_cell, aad=last_cid)
-    for key, cid in reversed(intermediate):
-        cell = wire.pack_data(kind, packet_id, layer)
+    for hop, (key, cid) in reversed(list(enumerate(intermediate))):
+        layer_kind = wire.KIND_COVER_TERMINATE if hop == terminate_at else kind
+        cell = wire.pack_data(layer_kind, packet_id, layer)
         layer = crypto_layer.seal(algorithm, key, cell, aad=cid)
     return layer
 
@@ -99,15 +106,17 @@ class Circuit:
     cell_size: int | None = None
     _next_id: int = field(default=1)
 
-    async def _send_cell(self, kind: int, packet_id: int, chunk: bytes) -> None:
+    async def _send_cell(self, kind: int, packet_id: int, chunk: bytes, terminate_at: int | None = None) -> None:
         target_cell = wire.pack_data(kind, packet_id, chunk)
         if self.cell_size is not None:
             target_cell = pad_to_cell_size(target_cell, self.cell_size, self.algorithm, len(self.keys_fwd))
-        sealed = wrap_layers(self.keys_fwd, self.circuit_ids, target_cell, self.algorithm, kind, packet_id)
+        sealed = wrap_layers(
+            self.keys_fwd, self.circuit_ids, target_cell, self.algorithm, kind, packet_id, terminate_at
+        )
         self.writer.write(wire.pack_frame(wire.MSG_RELAY_FWD, self.circuit_id, sealed))
         await self.writer.drain()
 
-    async def send(self, kind: int, payload: bytes) -> int:
+    async def send(self, kind: int, payload: bytes, terminate_at: int | None = None) -> int:
         """Sends `payload` as one cell, or, if it doesn't fit the fixed
         cell_size budget, splits it across multiple cells (fragmented
         the same way regardless of why it didn't fit: a payload larger
@@ -118,12 +127,18 @@ class Circuit:
         relay_process.py::process_relay_fwd). cover payloads never need
         the distinction: nothing confirms cover traffic either way, so
         every fragment can just stay KIND_COVER.
+
+        terminate_at (cover only) makes that hop index absorb the cell; see
+        wrap_layers. Indices at or past the last hop mean "the exit",
+        which absorbs cover anyway.
         """
+        if terminate_at is not None and (kind != wire.KIND_COVER or terminate_at >= len(self.keys_fwd) - 1):
+            terminate_at = None
         packet_id = self._next_id
         self._next_id += 1
 
         if self.cell_size is None:
-            await self._send_cell(kind, packet_id, payload)
+            await self._send_cell(kind, packet_id, payload, terminate_at)
             return packet_id
 
         max_chunk = self.cell_size - wire.layer_overhead(self.algorithm) * len(self.keys_fwd)
@@ -136,8 +151,8 @@ class Circuit:
         chunks = [payload[i : i + max_chunk] for i in range(0, len(payload), max_chunk)] or [b""]
         fragment_kind = wire.KIND_REAL_FRAGMENT if kind == wire.KIND_REAL else kind
         for chunk in chunks[:-1]:
-            await self._send_cell(fragment_kind, packet_id, chunk)
-        await self._send_cell(kind, packet_id, chunks[-1])
+            await self._send_cell(fragment_kind, packet_id, chunk, terminate_at)
+        await self._send_cell(kind, packet_id, chunks[-1], terminate_at)
         return packet_id
 
     async def recv_delivery(self) -> tuple[int, float]:

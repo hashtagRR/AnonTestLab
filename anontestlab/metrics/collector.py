@@ -25,6 +25,7 @@ class MetricsCollector:
             statistics.quantiles(latencies, n=20)[18] if len(latencies) >= 20 else avg_latency
         )
         bandwidth_overhead = (len(real) + len(cover)) / len(real) if real else float("nan")
+        oneway = sorted(p.exit_at - p.created_at for p in delivered_real if p.exit_at is not None)
 
         return {
             "real_packets_sent": len(real),
@@ -34,4 +35,13 @@ class MetricsCollector:
             "avg_latency_s": avg_latency,
             "p95_latency_s": p95_latency,
             "bandwidth_overhead_x": bandwidth_overhead,
+            "oneway_delay_p50_s": _quantile(oneway, 0.50),
+            "oneway_delay_p95_s": _quantile(oneway, 0.95),
+            "oneway_delay_p99_s": _quantile(oneway, 0.99),
         }
+
+
+def _quantile(sorted_values: list[float], q: float) -> float:
+    if not sorted_values:
+        return float("nan")
+    return sorted_values[min(len(sorted_values) - 1, int(q * len(sorted_values)))]

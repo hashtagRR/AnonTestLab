@@ -1,0 +1,40 @@
+# Loopix/Nym-style mixing on every hop. To measure what the mixing buys,
+# copy this file with `strategy: none` (everything else identical) and run:
+#   atl paired no_mixing.yaml examples/mixnet_pool.yaml --seeds 12 --metric auc
+experiment:
+  name: mixnet-pool
+  seed: 20260903
+  duration_s: 10
+  grace_period_s: 3          # a few times the mean added mixing delay
+
+network:
+  nodes: 20
+
+sessions:
+  count: 60
+
+routing:
+  strategy: random
+  path_length: 3
+
+traffic:
+  real_rate: 10
+  distribution: poisson
+  cover_rate: 5
+
+cover_behaviour:
+  drop_mode: random_hop      # each cover cell dies at one client-chosen hop
+
+mixing:
+  strategy: pool             # shared by every circuit through a relay
+  pool_interval_ms: 250
+  release_probability: 0.7   # cells can survive several flushes
+  interval_jitter: 0.3       # randomized flush timing
+
+crypto:
+  algorithm: aes256gcm
+
+adversary:
+  type: global_observer
+  observation: {bin_width_ms: 100}
+  evaluation: {calibration_fraction: 0.5}

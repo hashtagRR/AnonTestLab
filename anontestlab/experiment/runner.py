@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import random
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+import numpy as np
 
 from ..adversary import get_adversary
 from ..emulator.orchestrator import run_experiment as run_emulated_experiment
@@ -16,6 +18,7 @@ class ExperimentResult:
     config: ExperimentConfig
     metrics: dict[str, float]
     baseline_result: ExperimentResult | None = None
+    artifacts: dict[str, dict] = field(default_factory=dict)  # adversary name -> arrays written as <name>.npz
 
 
 def run_experiment(
@@ -28,14 +31,22 @@ def run_experiment(
     collector, ctx, avg_build_delay, sessions_failed = run_emulated_experiment(config, on_progress)
 
     metrics = collector.summary()
+    if config.num_paths > 1:
+        per_leg = [obs.leg_real_counts for obs in ctx.sessions.values() if sum(obs.leg_real_counts) > 0]
+        for leg in range(config.num_paths):
+            shares = [counts[leg] / sum(counts) for counts in per_leg]
+            metrics[f"leg_{leg}_real_share"] = sum(shares) / len(shares) if shares else float("nan")
     metrics["circuit_build_delay_s"] = avg_build_delay
     metrics["sessions_failed"] = sessions_failed
 
     rng = random.Random(config.seed)
+    artifacts: dict[str, dict] = {}
     for adversary_name in config.adversaries:
         adversary = get_adversary(adversary_name, config)
         result = adversary.attack(ctx, rng)
         metrics.update(result.metrics)
+        if result.artifacts:
+            artifacts[adversary_name] = result.artifacts
 
     baseline_result = None
     if config.baseline:
@@ -48,7 +59,7 @@ def run_experiment(
         baseline_config = ExperimentConfig.from_yaml(config.baseline)
         baseline_result = run_experiment(baseline_config, _baseline_depth=_baseline_depth + 1)
 
-    result = ExperimentResult(config=config, metrics=metrics, baseline_result=baseline_result)
+    result = ExperimentResult(config=config, metrics=metrics, baseline_result=baseline_result, artifacts=artifacts)
     if out_dir is not None:
         write_results(result, out_dir)
     return result
@@ -68,6 +79,9 @@ def write_results(result: ExperimentResult, out_dir: Path) -> None:
             f.write(f"{k},{v}\n")
 
     (out_dir / "report.md").write_text(_report_md(result))
+
+    for name, arrays in result.artifacts.items():
+        np.savez_compressed(out_dir / f"{name}.npz", **arrays)
 
 
 def _to_yaml(d: dict) -> str:

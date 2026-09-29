@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .experiment import ExperimentConfig, compare_experiments, run_experiment, run_sweep
+from .experiment import ExperimentConfig, compare_experiments, run_experiment, run_paired, run_sweep
 from .wizard import run_wizard
 
 
@@ -60,6 +60,30 @@ def main(argv: list[str] | None = None) -> int:
     sweep_p.add_argument("--values", type=str, required=True, help="Comma-separated values")
     sweep_p.add_argument("--out", type=str, default=None)
 
+    paired_p = sub.add_parser(
+        "paired", help="Run two experiments over the same seeds and classify the paired difference"
+    )
+    paired_p.add_argument("reference_yaml", type=str)
+    paired_p.add_argument("treatment_yaml", type=str)
+    paired_p.add_argument(
+        "--seeds", type=str, default="12",
+        help="A count N (uses the reference seed + 0..N-1) or a comma-separated seed list",
+    )
+    paired_p.add_argument("--metric", type=str, default="tpr_at_fpr_0.001")
+    paired_p.add_argument("--margin", type=float, default=0.05, help="Practical-equivalence margin")
+    paired_p.add_argument("--out", type=str, default=None)
+
+    predict_p = sub.add_parser(
+        "predict", help="Print the model's predictions for an experiment without running it"
+    )
+    predict_p.add_argument("experiment_yaml", type=str)
+
+    fidelity_p = sub.add_parser(
+        "fidelity", help="Measure host-induced timing noise for an experiment's load (mixing switched off)"
+    )
+    fidelity_p.add_argument("experiment_yaml", type=str)
+    fidelity_p.add_argument("--limit-fraction", type=float, default=0.1)
+
     sub.add_parser("wizard", help="Interactively build and run an experiment")
 
     dashboard_p = sub.add_parser("dashboard", help="Launch the local web dashboard")
@@ -110,6 +134,45 @@ def main(argv: list[str] | None = None) -> int:
             print(row)
         print(f"\nWritten to {out_dir}/")
         return 0
+
+    if args.command == "paired":
+        reference = ExperimentConfig.from_yaml(args.reference_yaml)
+        treatment = ExperimentConfig.from_yaml(args.treatment_yaml)
+        if "," in args.seeds:
+            seeds = [int(x) for x in args.seeds.split(",")]
+        else:
+            seeds = [reference.seed + i for i in range(int(args.seeds))]
+        out_dir = (
+            Path(args.out) if args.out else Path("results") / f"{reference.name}_vs_{treatment.name}_paired"
+        )
+        print(f"Running {reference.name} vs {treatment.name} over {len(seeds)} paired seeds...")
+        result = run_paired(reference, treatment, seeds, args.metric, args.margin, out_dir=out_dir)
+        e = result.effect
+        print(f"\n{args.metric}: mean delta {e.mean_delta:+.4f}, 95% CI [{e.ci_low:+.4f}, {e.ci_high:+.4f}]")
+        print(f"n = {e.n_pairs} pairs, margin +/-{args.margin}: {e.classification}")
+        print(f"\nWritten to {out_dir}/")
+        return 0
+
+    if args.command == "predict":
+        from .model import predict
+
+        config = ExperimentConfig.from_yaml(args.experiment_yaml)
+        psi = config.suite_psi[0] if config.suite_psi else 0.9
+        base_rate = config.suite_base_rates[0] if config.suite_base_rates else 1e-4
+        fpr = config.suite_fpr_targets[0] if config.suite_fpr_targets else 1e-3
+        _print_metrics(f"{config.name} (model prediction)", predict(config, fpr=fpr, psi=psi, base_rate=base_rate))
+        return 0
+
+    if args.command == "fidelity":
+        from .experiment.fidelity import run_fidelity
+
+        config = ExperimentConfig.from_yaml(args.experiment_yaml)
+        report = run_fidelity(config, args.limit_fraction)
+        print(f"\nFidelity check for {config.name}")
+        print("─" * 40)
+        for k, v in report.items():
+            print(f"{k:28s} {v:.4f}" if isinstance(v, float) else f"{k:28s} {v}")
+        return 0 if report["passes"] else 2
 
     if args.command == "wizard":
         config = run_wizard()

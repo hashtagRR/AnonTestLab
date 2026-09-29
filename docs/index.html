@@ -291,8 +291,8 @@
         <p class="lede">
           A real, circuit-based mix network for testing anonymous communication
           designs against 432 configurations of crypto, routing, traffic, and
-          adversary models, genuine OS processes and real sockets standing in
-          for the real network, not a discrete-event approximation of one.
+          adversary models, with OS processes and sockets standing in for the
+          network instead of a discrete-event approximation.
         </p>
         <div class="cta-row">
           <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab">View the source</a>
@@ -348,25 +348,25 @@ recall                         1.0000</div>
     <p style="color:var(--muted); max-width:68ch; margin-top:18px; font-size:1.02rem;">
       It's a <b style="color:var(--text);">low-latency, circuit-based mix network</b>:
       Tor's telescoping onion-routing design, where each relay (a mix node)
-      strips exactly one encryption layer and forwards, rather than the
+      strips exactly one encryption layer and forwards, as opposed to the
       high-latency batch-and-shuffle mixnets built for anonymous email. That's
       the specific design point every measurement on this page is testing.
     </p>
     <div class="contrib-grid" style="margin-top:36px; grid-template-columns: repeat(3, 1fr);">
       <div class="contrib">
         <div class="tag">Discrete-event simulator</div>
-        <h3>Fast, but assumed</h3>
-        <p>Latency, handshake cost, and crypto overhead are numbers someone chose. Change the assumption, get a different answer, not a different measurement.</p>
+        <h3>Fast, with assumed costs</h3>
+        <p>Latency, handshake cost and crypto overhead are numbers someone chose, so a changed assumption changes the answer without any new measurement.</p>
       </div>
       <div class="contrib">
         <div class="tag">Running real Tor</div>
-        <h3>Real, but heavyweight</h3>
-        <p>Every cost is genuine, but a new adversary or a swapped cipher means patching production software that was never built to be an experiment harness.</p>
+        <h3>Measured, but costly to change</h3>
+        <p>Costs are measured, but a new adversary or a swapped cipher means patching production software that was never built for experiments.</p>
       </div>
       <div class="contrib">
         <div class="tag">AnonTestLab</div>
-        <h3>Real, and a research harness</h3>
-        <p>Real relays, real sockets, real crypto cost, and every axis worth studying is a config field, not a fork.</p>
+        <h3>Measured and configurable</h3>
+        <p>Relays, sockets and crypto run for real, and each experimental axis is a config field, so a study needs no fork of the code.</p>
       </div>
     </div>
   </div>
@@ -374,8 +374,8 @@ recall                         1.0000</div>
 
 <section id="pipeline">
   <div class="wrap">
-    <div class="eyebrow">02 &middot; how a session actually runs</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Five real stages, no shortcuts</h2>
+    <div class="eyebrow">02 &middot; how a session runs</div>
+    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Five stages, each run for real</h2>
 
     <div class="circuit-diagram">
       <svg viewBox="0 0 1000 220" role="img" aria-label="Animated diagram of a telescoping onion circuit: a packet travels from the client through three relays to the exit, shedding one encryption layer per hop, while other relays in the addressable pool sit unused.">
@@ -435,7 +435,7 @@ recall                         1.0000</div>
         <div class="idx">2</div>
         <div>
           <h3><code>spawn_relays()</code> forks N real subprocesses</h3>
-          <p>Each relay is its own OS process bound to its own loopback address, <code>127.0.0.1</code> through <code>127.0.0.254</code>, not a coroutine pretending to be a host.</p>
+          <p>Each relay is its own OS process bound to its own loopback address, <code>127.0.0.1</code> through <code>127.0.0.254</code>, so each relay behaves as a separate host.</p>
         </div>
       </div>
       <div class="step">
@@ -470,8 +470,8 @@ recall                         1.0000</div>
     <div class="contrib-grid">
       <div class="contrib">
         <div class="tag">RUNTIME &middot; <code>anontestlab.emulator</code></div>
-        <h3>Genuine emulation, not a timing model</h3>
-        <p>Real subprocesses, real sockets, real crypto cost. Latency and delivery are measured outcomes, never sampled from a distribution someone had to assume first.</p>
+        <h3>Emulation without a timing model</h3>
+        <p>Subprocesses, sockets and crypto run for real. Latency and delivery are measured, with no assumed distribution behind them.</p>
       </div>
       <div class="contrib">
         <div class="tag">CRYPTO &middot; <code>crypto_layer.py</code></div>
@@ -486,12 +486,12 @@ recall                         1.0000</div>
       <div class="contrib">
         <div class="tag">CRYPTO &middot; <code>anontestlab.crypto</code></div>
         <h3>Crypto-agility as a first-class axis</h3>
-        <p>Six AEAD ciphers across three ECDHE curves, selectable per experiment, for studies that actually compare algorithm choice rather than assuming one.</p>
+        <p>Six AEAD ciphers across three ECDHE curves, selectable per experiment, for studies that compare the choice of algorithm.</p>
       </div>
       <div class="contrib">
         <div class="tag">NETWORK &middot; <code>relay_process.py</code></div>
         <h3>WAN realism at two granularities</h3>
-        <p>Per-node heterogeneous conditions layer with directional per-edge conditions, so a relay's link to one peer can differ from its link to another, not just from other relays.</p>
+        <p>Per-node heterogeneous conditions layer with directional per-edge conditions, so a relay's link to one peer can differ from its link to another as well as from other relays.</p>
       </div>
       <div class="contrib">
         <div class="tag">ADVERSARY &middot; <code>anontestlab.adversary</code></div>
@@ -500,8 +500,8 @@ recall                         1.0000</div>
       </div>
       <div class="contrib">
         <div class="tag">METHOD &middot; README.md</div>
-        <h3>Simplifications are disclosed, not discovered</h3>
-        <p>Every scope trim is stated in the open and, where practical, given its own regression test, so "known limitation" means audited, not unexamined.</p>
+        <h3>Simplifications are stated</h3>
+        <p>Every scope trim is stated in the open and, where practical, has its own regression test, so each known limitation has been checked.</p>
       </div>
     </div>
   </div>
@@ -514,7 +514,7 @@ recall                         1.0000</div>
     <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
       6 AEAD ciphers &times; 3 ECDHE curves &times; 2 routing strategies &times; 3
       traffic distributions &times; 4 adversary models: 432 combinations, each one
-      a real config field, not a code change.
+      set by config fields without code changes.
     </p>
 
     <h3 style="font-family:'IBM Plex Mono', monospace; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-top:48px;">Traffic &amp; topology</h3>
@@ -592,10 +592,9 @@ recall                         1.0000</div>
 <section id="limitations">
   <div class="wrap">
     <div class="eyebrow">05 &middot; methodology</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Disclosed simplifications, not claims</h2>
+    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Disclosed simplifications</h2>
     <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
-      A research harness earns trust by stating its scope trims in the open. These
-      are the ones that still stand, each one deliberate:
+      These scope trims still stand, each one deliberate:
     </p>
     <div class="disclosure">
       <h3>Known limitations, v0.3</h3>

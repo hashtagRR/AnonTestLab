@@ -70,3 +70,37 @@ class ParetoTraffic(TrafficGenerator):
             times.append(t)
             t += min_gap * rng.paretovariate(self.shape)
         return times
+
+
+@dataclass
+class BurstTraffic(TrafficGenerator):
+    """Bursts of back-to-back cells, the shape of web and bulk transfers over
+    Tor. Bursts start as a Poisson process of rate rate / burst_mean_cells;
+    each carries a geometric number of cells (mean burst_mean_cells, at least
+    one) sent burst_gap_ms apart, so the long-run cell rate is `rate`. For
+    bins much longer than a burst, the per-bin counts have index of
+    dispersion 2 * burst_mean_cells - 1 (1 for Poisson)."""
+
+    rate: float  # cells per second
+    burst_mean_cells: float = 12.0
+    burst_gap_ms: float = 2.0
+
+    def emission_times(self, rng: random.Random, duration: float) -> list[float]:
+        if self.rate <= 0:
+            return []
+        mean = max(self.burst_mean_cells, 1.0)
+        burst_rate = self.rate / mean
+        gap = self.burst_gap_ms / 1000.0
+        stop = 1.0 / mean  # geometric on 1, 2, ... with this mean
+        times = []
+        t = rng.expovariate(burst_rate)
+        while t < duration:
+            cell_t = t
+            while cell_t < duration:
+                times.append(cell_t)
+                if rng.random() < stop:
+                    break
+                cell_t += gap
+            t += rng.expovariate(burst_rate)
+        times.sort()
+        return times

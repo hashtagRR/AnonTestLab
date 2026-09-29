@@ -5,8 +5,8 @@ Determinism note: each session gets its own RNG seeded from
 `(config.seed, session_id)`, so *which* paths are chosen and *when*
 packets are scheduled is fully reproducible from the seed, but sessions
 run concurrently over real sockets, so the actual measured latency/
-delivery timing will vary run to run like any real system's would. That's
-real system behavior, not a bug; only the experiment design is pinned.
+delivery timing will vary run to run like any real system's would; only
+the experiment design is pinned.
 """
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from ..routing import get_strategy
 from ..traffic import get_generator
 from . import wire
 from .circuit_client import Circuit, build_circuit
+from .splitting import LegScheduler
 
 if TYPE_CHECKING:
     # Only needed for type hints; importing it at module level would
@@ -75,6 +76,8 @@ async def spawn_relays(
     per_edge: bool = False,
     link_seed: int = 0,
     link_heterogeneity_spread: float = 0.5,
+    mixing: dict | None = None,
+    mix_seed: int = 0,
 ) -> list[RelayHandle]:
     """link_factors, if given, is one multiplicative scale per node index
     (node i's actual latency/jitter/loss/bandwidth = base * link_factors[i]),
@@ -88,7 +91,13 @@ async def spawn_relays(
     see relay_process.py::edge_factor for the directional-only scope of
     this (the receiving side's own upstream-facing sends aren't scaled
     by it, a disclosed simplification).
+
+    mixing, if given, holds the relay-side mixing settings (strategy,
+    delay_ms, pool_interval_ms, release_probability, interval_jitter),
+    identical on every relay; each relay's mixing RNG is seeded from
+    mix_seed + its index.
     """
+    mixing = mixing or {}
     handles = []
     for i in range(num_nodes):
         host = _relay_host(i)
@@ -128,6 +137,18 @@ async def spawn_relays(
             str(link_seed),
             "--link-heterogeneity-spread",
             str(link_heterogeneity_spread),
+            "--mix-strategy",
+            str(mixing.get("strategy", "none")),
+            "--mix-delay-ms",
+            str(mixing.get("delay_ms", 0.0)),
+            "--pool-interval-ms",
+            str(mixing.get("pool_interval_ms", 100.0)),
+            "--pool-release-probability",
+            str(mixing.get("release_probability", 1.0)),
+            "--pool-interval-jitter",
+            str(mixing.get("interval_jitter", 0.0)),
+            "--mix-seed",
+            str(mix_seed + i),
         ]
         if per_edge:
             args.append("--per-edge")
@@ -165,20 +186,34 @@ async def terminate_relays(handles: list[RelayHandle]) -> None:
             await h.process.wait()
 
 
-class PathSplitter:
-    def __init__(self, strategy: str, num_paths: int):
-        self.strategy = strategy
-        self.num_paths = num_paths
-        self._counters: dict[int, int] = {}
+def make_scheduler(config: ExperimentConfig) -> LegScheduler:
+    """A fresh split-policy state for one session (see emulator/splitting.py)."""
+    return LegScheduler(
+        config.split_strategy,
+        config.num_paths,
+        weights=config.split_weights,
+        batch_mean_s=config.split_batch_mean_s,
+        leg_rtt_s=[ms / 1000.0 for ms in config.split_leg_rtt_ms] if config.split_leg_rtt_ms else None,
+        leg_window=config.split_leg_window,
+    )
 
-    def assign(self, session_id: int, rng: random.Random) -> int:
-        if self.num_paths == 1:
-            return 0
-        if self.strategy == "random":
-            return rng.randrange(self.num_paths)
-        i = self._counters.get(session_id, 0)
-        self._counters[session_id] = i + 1
-        return i % self.num_paths
+
+def select_node_paths(config: ExperimentConfig, node_ids: list[str], rng: random.Random, weights) -> list[list[str]]:
+    """Relays for every leg of one session. With merge == "common_exit" all
+    legs end at one exit relay (Conflux-style) and their other hops are
+    drawn without reuse across legs, so every leg has its own entry guard."""
+    specs = config.paths
+    if config.merge != "common_exit" or len(specs) == 1:
+        return [get_strategy(s.strategy).select_path(node_ids, rng, s.path_length, weights) for s in specs]
+    exit_node = rng.choice(node_ids)
+    used = {exit_node}
+    paths = []
+    for spec in specs:
+        pool = [n for n in node_ids if n not in used]
+        head = get_strategy(spec.strategy).select_path(pool, rng, spec.path_length - 1, weights)
+        used.update(head)
+        paths.append([*head, exit_node])
+    return paths
 
 
 def _fixed_rate_schedule(real_times: list[float], config: ExperimentConfig) -> list[tuple[float, str]]:
@@ -220,12 +255,17 @@ async def run_session(
     addr_paths: list[list[tuple[str, int]]],
     config: ExperimentConfig,
     rng: random.Random,
-    splitter: PathSplitter,
+    scheduler: LegScheduler,
     observed_entry_indices: set[int],
     observed_exit_indices: set[int],
     experiment_start: float,
 ) -> tuple[list[Packet], SessionObservation, float]:
-    real_gen = get_generator(config.real_traffic_distribution, config.real_rate)
+    real_gen = get_generator(
+        config.real_traffic_distribution,
+        config.real_rate,
+        burst_mean_cells=config.burst_mean_cells,
+        burst_gap_ms=config.burst_gap_ms,
+    )
     cover_gen = (
         get_generator(config.cover_traffic_distribution, config.cover_rate)
         if config.cover_rate > 0
@@ -241,7 +281,12 @@ async def run_session(
     )
     build_delay = time.monotonic() - build_start
 
-    obs = SessionObservation(session_id=session_id)
+    obs = SessionObservation(session_id=session_id, leg_real_counts=[0] * len(circuits))
+    # Timestamps are measured from the experiment start, so concurrent flows
+    # share one clock. In wave mode (max_concurrent_sessions) sessions run at
+    # different times, and each one is measured from its own start instead,
+    # so all flows line up on [0, duration_s] as if they had run together.
+    origin = time.monotonic() if config.max_concurrent_sessions else experiment_start
     packets: list[Packet] = []
     pending: dict[tuple[int, int], Packet] = {}
     next_packet_id = 0
@@ -254,10 +299,11 @@ async def run_session(
         try:
             while True:
                 packet_id, exit_t = await circuit.recv_delivery()
-                t = time.monotonic() - experiment_start
+                t = time.monotonic() - origin
                 pkt = pending.pop((path_idx, packet_id), None)
                 if pkt is not None:
                     pkt.delivered_at = t
+                    pkt.exit_at = exit_t - origin
                     if path_idx in observed_exit_indices:
                         # exit_t, not t: t is when the confirmation finished
                         # its own round trip back through every hop (with
@@ -265,7 +311,7 @@ async def run_session(
                         # way back), not when the packet actually left the
                         # exit hop, which is what a passive exit observer
                         # would actually see.
-                        obs.egress_times.append(exit_t - experiment_start)
+                        obs.egress_times.append(exit_t - origin)
                         obs.egress_seq.append(pkt.real_seq)
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             pass
@@ -287,12 +333,17 @@ async def run_session(
         if target > now:
             await asyncio.sleep(target - now)
 
-        path_idx = splitter.assign(session_id, rng)
+        path_idx = scheduler.assign(t, rng)
+        if kind == "real":
+            obs.leg_real_counts[path_idx] += 1
         circuit = circuits[path_idx]
+        terminate_at = None
+        if kind == "cover" and config.cover_drop_mode == "random_hop":
+            terminate_at = rng.randrange(len(circuit.path))  # the last index means the exit, which absorbs cover anyway
         packet_id = await circuit.send(
-            wire.KIND_REAL if kind == "real" else wire.KIND_COVER, os.urandom(PAYLOAD_SIZE)
+            wire.KIND_REAL if kind == "real" else wire.KIND_COVER, os.urandom(PAYLOAD_SIZE), terminate_at
         )
-        t_send = time.monotonic() - experiment_start
+        t_send = time.monotonic() - origin
 
         next_packet_id += 1  # noqa: SIM113 - a Packet.packet_id counter, not this loop's index
         if kind == "real":
@@ -339,7 +390,7 @@ async def run_experiment_async(
     handles = await spawn_relays(
         config.num_nodes,
         config.crypto_algorithm,
-        config.cover_drop_probability,
+        config.cover_drop_probability if config.cover_drop_mode == "per_hop" else 0.0,
         config.watermark_period,
         config.watermark_delay_ms,
         config.link_latency_ms,
@@ -351,6 +402,14 @@ async def run_experiment_async(
         config.link_per_edge,
         config.seed * 7919 + 17,  # decorrelated from other seeded RNGs derived from config.seed
         config.link_heterogeneity_spread,
+        {
+            "strategy": config.mix_strategy,
+            "delay_ms": config.mix_delay_ms,
+            "pool_interval_ms": config.pool_interval_ms,
+            "release_probability": config.pool_release_probability,
+            "interval_jitter": config.pool_interval_jitter,
+        },
+        config.seed * 104729 + 31,  # decorrelated from the other seed-derived RNGs
     )
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
@@ -366,7 +425,6 @@ async def run_experiment_async(
         sessions_completed = 0
 
         path_specs = config.paths
-        splitter = PathSplitter(config.split_strategy, len(path_specs))
         experiment_start = time.monotonic()
 
         # AS-level partial observer: a structural property of where the
@@ -381,15 +439,12 @@ async def run_experiment_async(
         async def run_one(session_id: int) -> None:
             session_rng = random.Random(config.seed * 1_000_003 + session_id + 1)
 
-            node_paths = [
-                get_strategy(spec.strategy).select_path(node_ids, session_rng, spec.path_length, node_weights)
-                for spec in path_specs
-            ]
+            node_paths = select_node_paths(config, node_ids, session_rng, node_weights)
             if config.watermark_period > 0:
                 # The watermark relay only makes sense as hop 1. Pin it
                 # there on the first path (swap rather than overwrite, to
-                # keep the path's nodes distinct). It's not excluded from
-                # other paths/positions it might land in by chance; a
+                # keep the path's nodes distinct). It may still land in
+                # other paths/positions by chance; a
                 # known edge case for a deliberately simple model.
                 watermark_node_id = node_ids[WATERMARK_NODE_INDEX]
                 first_path = node_paths[0]
@@ -405,17 +460,22 @@ async def run_experiment_async(
             if config.num_as_groups > 1:
                 observed_entry_indices = {i for i, p in enumerate(node_paths) if as_of[p[0]] in observed_as_ids}
                 observed_exit_indices = {i for i, p in enumerate(node_paths) if as_of[p[-1]] in observed_as_ids}
+            elif config.observed_legs is not None:
+                observed_entry_indices = observed_exit_indices = set(config.observed_legs)
             else:
                 k = config.observed_path_count or len(path_specs)
                 observed_entry_indices = observed_exit_indices = set(
                     session_rng.sample(range(len(path_specs)), min(k, len(path_specs)))
                 )
+            if config.egress_observation == "merged":
+                # the exit-side observer sees the whole flow after the legs merge
+                observed_exit_indices = set(range(len(path_specs)))
 
             # A lost handshake packet (under configured link_loss_probability)
             # surfaces here as a ProtocolError (see wire.read_frame_timeout) or
-            # a connection-level failure. That's realistic behavior worth
-            # seeing, not a bug, but it must fail only *this* session, not
-            # take down the whole experiment. session_paths above is already
+            # a connection-level failure. That is realistic behavior worth
+            # seeing; it must fail only *this* session and leave the rest of
+            # the experiment running. session_paths above is already
             # recorded regardless, so path_compromise is unaffected.
             nonlocal sessions_failed, sessions_completed
             try:
@@ -424,7 +484,7 @@ async def run_experiment_async(
                     addr_paths,
                     config,
                     session_rng,
-                    splitter,
+                    make_scheduler(config),
                     observed_entry_indices,
                     observed_exit_indices,
                     experiment_start,
@@ -457,7 +517,16 @@ async def run_experiment_async(
                 build_delay_s=build_delay,
             )
 
-        await asyncio.gather(*[run_one(sid) for sid in range(config.num_sessions)])
+        if config.max_concurrent_sessions:
+            gate = asyncio.Semaphore(config.max_concurrent_sessions)
+
+            async def gated(sid: int) -> None:
+                async with gate:
+                    await run_one(sid)
+
+            await asyncio.gather(*[gated(sid) for sid in range(config.num_sessions)])
+        else:
+            await asyncio.gather(*[run_one(sid) for sid in range(config.num_sessions)])
         emit("experiment_complete", sessions_failed=sessions_failed, total=config.num_sessions)
 
         ctx = SimulationContext(sessions=observations, session_paths=session_paths, node_ids=node_ids)

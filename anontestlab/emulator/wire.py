@@ -15,8 +15,8 @@ msg_type:
 circuit_id is hop-local, not shared across the whole path: each EXTEND
 carries the next hop-link's ID, so a link tap can't correlate sessions
 by matching IDs across hops. Known simplification: RELAY_BACK bodies
-aren't re-wrapped per hop on the way back. That's a disclosed scope
-trim, not a claim of traffic-analysis resistance.
+aren't re-wrapped per hop on the way back. That is a disclosed scope
+trim and makes no claim of traffic-analysis resistance.
 """
 from __future__ import annotations
 
@@ -168,3 +168,9 @@ KIND_REAL_FRAGMENT = 3  # a non-final fragment of a real payload split across
                   # counting), but the terminal hop must not confirm it:
                   # only the final fragment, sent as plain KIND_REAL,
                   # triggers a delivery confirmation.
+KIND_COVER_TERMINATE = 4  # cover whose route ends at this hop: the client marks
+                  # exactly one hop's layer with this kind (see
+                  # circuit_client.py::wrap_layers, terminate_at) and that
+                  # hop absorbs the cell instead of forwarding it. Every other
+                  # hop's layer says plain KIND_COVER, so no hop learns where
+                  # a cover cell dies unless it's the one that absorbs it.

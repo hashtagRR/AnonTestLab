@@ -1,5 +1,5 @@
 """Pure-Python tests for HopDepthAdversary: no subprocesses needed, since
-it's structural (like path_compromise), not timing-based. The underlying
+it is structural (like path_compromise) and does not depend on timing. The underlying
 wire-size-per-hop math is independently verified against the real
 crypto/wire code in
 test_wire_and_crypto.py::test_fixed_cell_size_shrinks_by_a_fixed_amount_per_hop."""

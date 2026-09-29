@@ -79,8 +79,8 @@ def test_ecdh_handshake_derives_matching_keys(keyexchange):
 
 
 def test_forward_and_backward_keys_are_independent():
-    """Reusing one key both directions would be a protocol weakness, not
-    just a missed optimization: confirm they're genuinely different."""
+    """Reusing one key in both directions would be a protocol weakness:
+    confirm the two keys differ."""
     priv_a, _pub_a = crypto_layer.generate_ephemeral_keypair()
     _priv_b, pub_b = crypto_layer.generate_ephemeral_keypair()
     key_fwd, key_back = crypto_layer.derive_key(priv_a, pub_b, "aes256gcm")
@@ -177,8 +177,7 @@ def test_backward_layers_cannot_be_read_with_only_the_deepest_hops_key():
 
 def test_wrap_layers_rejects_wrong_hop_local_circuit_id():
     """Opening a layer with the wrong (e.g. path-wide-shared) circuit ID
-    as AAD must fail. This is what makes hop-local IDs actually binding
-    rather than cosmetic."""
+    as AAD must fail. This is what makes hop-local IDs binding."""
     keys = [b"0" * 32, b"1" * 32]
     cids = [b"11111111", b"22222222"]
     target_cell = wire.pack_data(wire.KIND_REAL, 1, b"payload")

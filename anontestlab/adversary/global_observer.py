@@ -24,11 +24,13 @@ class GlobalPassiveObserver(Adversary):
         classifier: str = "pearson",
         threshold: float = 0.7,
         fpr_targets: tuple[float, ...] = (0.1, 0.01, 0.001),
+        calibration_fraction: float = 0.0,
     ):
         self.bin_size = bin_size
         self.classifier = classifier
         self.threshold = threshold
         self.fpr_targets = fpr_targets
+        self.calibration_fraction = calibration_fraction
 
     @classmethod
     def from_config(cls, config) -> GlobalPassiveObserver:
@@ -36,6 +38,7 @@ class GlobalPassiveObserver(Adversary):
             bin_size=getattr(config, "observer_bin_width_ms", 50.0) / 1000.0,
             classifier=getattr(config, "observer_classifier", "pearson"),
             threshold=getattr(config, "observer_threshold", 0.7),
+            calibration_fraction=getattr(config, "observer_calibration_fraction", 0.0),
         )
 
     def attack(self, ctx: SimulationContext, rng: random.Random) -> AdversaryResult:
@@ -60,6 +63,9 @@ class GlobalPassiveObserver(Adversary):
 
         extractor = features.get_feature_extractor(self.classifier)
         scores = extractor(ingress, egress)
-        metrics = decision.evaluate_scores(scores, self.threshold, self.fpr_targets)
+        split_rng = np.random.default_rng(rng.randrange(2**32)) if self.calibration_fraction > 0 else None
+        metrics = decision.evaluate_scores(
+            scores, self.threshold, self.fpr_targets, self.calibration_fraction, split_rng
+        )
 
         return AdversaryResult(name=self.name, n_sessions=n, metrics=metrics)
