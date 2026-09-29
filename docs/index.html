@@ -466,7 +466,7 @@ recall                         1.0000</div>
 <section id="contributions">
   <div class="wrap">
     <div class="eyebrow">03 &middot; what this adds to the domain</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:34ch;">Seven things you can't test on a discrete-event simulator</h2>
+    <h2 style="font-size:2rem; font-weight:800; max-width:34ch;">Eleven things you can't test on a discrete-event simulator</h2>
     <div class="contrib-grid">
       <div class="contrib">
         <div class="tag">RUNTIME &middot; <code>anontestlab.emulator</code></div>
@@ -502,6 +502,26 @@ recall                         1.0000</div>
         <div class="tag">METHOD &middot; README.md</div>
         <h3>Simplifications are stated</h3>
         <p>Every scope trim is stated in the open and, where practical, has its own regression test, so each known limitation has been checked.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">ROUTING &middot; <code>splitting.py</code> &middot; v0.4</div>
+        <h3>Multipath split policies</h3>
+        <p>One flow split over several circuits that share an exit, as in Conflux: i.i.d., weighted round-robin, batch and lowest-RTT scheduling, with the adversary observing chosen entry legs and the merged exit side.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">NETWORK &middot; <code>mixing.py</code> &middot; v0.4</div>
+        <h3>Relay mixing and bursty traffic</h3>
+        <p>Constant, exponential (Loopix-style) or pool mixing at every hop, and a bursty traffic generator whose dispersion can be matched to measured Tor traffic, so mix-network and onion-routing settings share one emulator.</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">ADVERSARY &middot; <code>correlation_suite.py</code> &middot; v0.4</div>
+        <h3>Training-free correlation attackers with predictions</h3>
+        <p>Zero-lag, lag-aware, likelihood-ratio and timing-window attackers scored side by side on one held-out split, with confident linkage at a stated base rate and closed-form model predictions recorded next to every measurement (<code>atl predict</code>).</p>
+      </div>
+      <div class="contrib">
+        <div class="tag">METHOD &middot; <code>fidelity.py</code> &middot; v0.4</div>
+        <h3>A check on host-induced timing noise</h3>
+        <p><code>atl fidelity</code> reruns an experiment's load with mixing off and reports the delay the host adds, so a run on a busy machine is flagged before its timing results are trusted; wave mode keeps large runs under that limit.</p>
       </div>
     </div>
   </div>
@@ -597,13 +617,15 @@ recall                         1.0000</div>
       These scope trims still stand, each one deliberate:
     </p>
     <div class="disclosure">
-      <h3>Known limitations, v0.3</h3>
+      <h3>Known limitations, v0.4</h3>
       <ul>
         <li><b>Fixed-size cells still leak hop position.</b> A global observer watching multiple hops of one circuit could infer depth from the size sequence, which is exactly what <code>hop_depth</code> measures.</li>
         <li><b>Per-edge link conditions are directional-only.</b> Only the connection-initiating side scales by the edge factor; the receiving side's own upstream sends still use its plain per-node value.</li>
         <li><b>No relay identity or directory system.</b> Keys are ephemeral only: no TOFU question to answer, but also no persistent relay reputation.</li>
         <li><b><code>bandwidth_weighted</code> routing skips guard/exit-flag constraints.</b> It weights by node capacity alone, deliberately not replicating Tor's position rules.</li>
-        <li><b>Timing varies run to run.</b> The experiment design is reproducible from its seed; real measured latency isn't, because it's real.</li>
+        <li><b>Wave mode changes the timestamp origin.</b> With <code>sessions.max_concurrent</code>, each session's timestamps start at its own start, so flows from different waves line up as if concurrent.</li>
+        <li><b>The <code>latency</code> split policy uses nominal RTTs.</b> The scheduler follows the configured leg RTTs; the legs are not given different real latencies.</li>
+        <li><b>Timing varies run to run.</b> The experiment design is reproducible from its seed; measured latency varies because it comes from real runs.</li>
       </ul>
     </div>
   </div>
@@ -637,7 +659,7 @@ recall                         1.0000</div>
     </div>
     <div class="foot-bottom">
       <span>AnonTestLab &middot; maintained by hashtagRR</span>
-      <span>spec revision v0.3</span>
+      <span>spec revision v0.4</span>
     </div>
   </div>
 </footer>

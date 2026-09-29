@@ -102,9 +102,9 @@ def test_dispersion_forms_reduce_to_poisson_and_approach_one_for_bursty_counts()
 
 
 def test_predict_uses_the_measured_dispersion_of_the_generator():
-    base = dict(name="t", duration_s=40.0, real_rate=40.0, mix_strategy="exponential", mix_delay_ms=25.0,
-                split_strategy="iid", observed_legs=[0], suite_bin_widths_s=[0.25], suite_lag_max_s=1.0,
-                extra_paths=[PathSpec("random", 3)])
+    base = {"name": "t", "duration_s": 40.0, "real_rate": 40.0, "mix_strategy": "exponential",
+            "mix_delay_ms": 25.0, "split_strategy": "iid", "observed_legs": [0], "suite_bin_widths_s": [0.25],
+            "suite_lag_max_s": 1.0, "extra_paths": [PathSpec("random", 3)]}
     poisson = model.predict(ExperimentConfig(**base))
     burst = model.predict(ExperimentConfig(real_traffic_distribution="burst", burst_mean_cells=12.0, **base))
     assert poisson["model_dispersion_w0.25"] == 1.0
