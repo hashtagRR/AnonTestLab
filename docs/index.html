@@ -72,6 +72,35 @@
     .mark:before{width:20px;height:20px}.mark:after{width:7px;height:7px;background:var(--orange)}
     .navlinks{display:flex;align-items:center;gap:25px;font-size:14px;color:#52564c}
     .navlinks a:hover{color:var(--ink)}
+    .navlinks a:not(.github){
+      position:relative;
+      padding:8px 11px;
+      border-radius:10px;
+      transition:color .2s ease, background .2s ease, box-shadow .2s ease;
+    }
+    .navlinks a:not(.github)::after{
+      content:"";
+      position:absolute;
+      left:11px;
+      right:11px;
+      bottom:4px;
+      height:2px;
+      border-radius:999px;
+      background:linear-gradient(90deg,var(--cyan),var(--violet));
+      transform:scaleX(0);
+      transform-origin:center;
+      transition:transform .22s ease;
+    }
+    .navlinks a:not(.github):hover{
+      background:rgba(94,215,255,.07);
+    }
+    .navlinks a:not(.github).active{
+      color:#e9f8ff;
+      background:rgba(94,215,255,.14);
+      box-shadow:inset 0 0 0 1px rgba(94,215,255,.18), 0 5px 18px rgba(61,176,220,.08);
+    }
+    .navlinks a:not(.github).active::after{transform:scaleX(1)}
+    main section[id]{scroll-margin-top:92px}
     .github{
       display:inline-flex;align-items:center;gap:8px;background:var(--black);color:white;
       padding:10px 15px;border-radius:999px;font-weight:750;
@@ -207,6 +236,29 @@
     .limit strong{display:block;margin-bottom:4px}
     .limit span{color:var(--muted);font-size:14px}
 
+    .license-section{
+      padding-top:18px;
+    }
+    .license-card{
+      display:grid;
+      grid-template-columns:.72fr 1.28fr;
+      gap:48px;
+      padding:38px;
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:28px;
+      background:
+        radial-gradient(circle at 8% 15%, rgba(87,211,255,.10), transparent 18rem),
+        linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));
+    }
+    .license-card h2{font-size:clamp(34px,4.2vw,56px)}
+    .license-copy p{color:var(--muted);font-size:16px;margin:0 0 14px}
+    .license-copy strong{color:#eef5ff}
+    .license-link{
+      display:inline-flex;align-items:center;gap:8px;margin-top:8px;
+      color:var(--cyan-2);font-weight:800;font-size:14px
+    }
+    .license-link:hover{color:#fff}
+
     .cta{
       margin:70px auto;background:var(--green);color:white;border-radius:32px;padding:58px;
       display:flex;justify-content:space-between;gap:35px;align-items:end;overflow:hidden;position:relative;
@@ -230,6 +282,7 @@
       .problem,.problem+.problem{padding:24px 0;border-right:0;border-bottom:1px solid var(--line)}
       .flow{grid-template-columns:1fr 1fr}
       .cta{align-items:flex-start;flex-direction:column}
+      .license-card{grid-template-columns:1fr}
     }
     @media(max-width:600px){
       .wrap{width:min(calc(100% - 24px),var(--max))}
@@ -296,11 +349,12 @@
         <span>AnonTestLab</span>
       </a>
       <div class="navlinks">
-        <a href="#why">Why</a>
-        <a href="#capabilities">Capabilities</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#research">Research</a>
-        <a href="#limitations">Limitations</a>
+        <a href="#why" data-nav="why">Why</a>
+        <a href="#capabilities" data-nav="capabilities">Capabilities</a>
+        <a href="#workflow" data-nav="workflow">Workflow</a>
+        <a href="#research" data-nav="research">Research</a>
+        <a href="#limitations" data-nav="limitations">Scope</a>
+        <a href="#license" data-nav="license">Free Software</a>
         <a class="github" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">GitHub ↗</a>
       </div>
     </nav>
@@ -420,7 +474,7 @@
           <h3>Simulation abstracts away execution.</h3>
           <p>
             Simulation is powerful for controlled studies, but process scheduling, socket behavior, cryptographic work and implementation timing
-            may be represented by models rather than observed from a running protocol.
+            may be modeled, while an executing protocol can expose effects that those models omit.
           </p>
         </article>
         <article class="problem">
@@ -450,16 +504,16 @@
           </p>
           <p>
             And when execution matters, the measurements should be able to come from real relay processes, sockets, circuit construction
-            and per-hop cryptography rather than only from a synthetic timing model.
+            and per-hop cryptography, giving timing studies an execution-based measurement layer.
           </p>
         </div>
         <div class="need-points">
           <div class="need-point"><strong>Comparable</strong><span>Test different mechanisms in the same environment.</span></div>
           <div class="need-point"><strong>Configurable</strong><span>Change research variables instead of rewriting infrastructure.</span></div>
-          <div class="need-point"><strong>Observable</strong><span>Measure an executing local network, not just a model of one.</span></div>
+          <div class="need-point"><strong>Observable</strong><span>Measure behavior directly from an executing local network.</span></div>
           <div class="need-point"><strong>Reproducible</strong><span>Preserve configuration, seeds, metrics and reports.</span></div>
           <div class="need-point"><strong>Adversary-aware</strong><span>Make observer capability an explicit experimental variable.</span></div>
-          <div class="need-point"><strong>Falsifiable</strong><span>Compare, sweep and repeat rather than relying on one attractive run.</span></div>
+          <div class="need-point"><strong>Falsifiable</strong><span>Compare, sweep and repeat across controlled runs.</span></div>
         </div>
       </div>
 
@@ -526,10 +580,10 @@
           <p>Circuits perform telescoping handshakes and use selectable AEAD algorithms instead of adding an artificial crypto delay.</p>
           <ul>
             <li>X25519, X448 and P-256 ECDHE</li>
-            <li>AES-GCM variants, OCB3* and ChaCha20-Poly1305</li>
+            <li>AES-GCM, AES-GCM-SIV*, OCB3** and ChaCha20-Poly1305</li>
             <li>Plaintext mode to isolate transport cost</li>
           </ul>
-          <p class="micro-note">* AES-OCB3 requires OCB support in the host OpenSSL build.</p>
+          <p class="micro-note">* AES-GCM-SIV requires cryptography ≥ 42 with OpenSSL 3.2+. Standard cryptography wheels satisfy this on common platforms.<br>** AES-OCB3 requires OCB support in the OpenSSL build.</p>
         </article>
 
         <article class="card reveal">
@@ -546,7 +600,7 @@
         <article class="card reveal">
           <div class="icon">◎</div>
           <h3>Pluggable adversaries</h3>
-          <p>Make attacker capability an explicit experimental parameter rather than an implicit assumption.</p>
+          <p>Make attacker capability an explicit experimental parameter, including what the observer can see.</p>
           <ul>
             <li>Global / partial traffic observation</li>
             <li>Correlation suite and path compromise</li>
@@ -642,7 +696,7 @@
         <div class="kicker">04 / Research questions</div>
         <div>
           <h2>Built to turn anonymity claims into experiments.</h2>
-          <p class="subcopy">The framework does not prescribe one answer. It makes the assumptions behind the question configurable.</p>
+          <p class="subcopy">Each question can be tested under explicit, configurable assumptions.</p>
         </div>
       </div>
 
@@ -650,7 +704,7 @@
         <article class="question reveal"><small>Multipath</small><p>Does path splitting still help when the observer can see more than one leg?</p></article>
         <article class="question reveal"><small>Correlation</small><p>Does a delay defense survive when the attacker becomes lag-aware?</p></article>
         <article class="question reveal"><small>Cover traffic</small><p>How much correlation reduction is gained for the additional bandwidth cost?</p></article>
-        <article class="question reveal"><small>Mixing</small><p>When does pool or exponential mixing produce a meaningful effect rather than host noise?</p></article>
+        <article class="question reveal"><small>Mixing</small><p>When does pool or exponential mixing produce an effect that remains after host noise is accounted for?</p></article>
         <article class="question reveal"><small>Visibility</small><p>How much of the network must an adversary observe before linkage becomes reliable?</p></article>
         <article class="question reveal"><small>Validity</small><p>Is the result caused by the protocol configuration, or by the machine running the experiment?</p></article>
       </div>
@@ -668,16 +722,42 @@
       </div>
 
       <div class="limits-list reveal">
-        <div class="limit"><strong>Not a Tor protocol implementation.</strong><span>The project uses its own simple wire protocol and does not implement Tor's directory or consensus system.</span></div>
-        <div class="limit"><strong>Fixed-size shaping is optional.</strong><span>Cells are not fixed-size by default; traffic shaping can opt into fixed-size padding.</span></div>
+        <div class="limit"><strong>Custom wire protocol with Tor-inspired circuits.</strong><span>The project uses its own wire protocol and omits Tor's directory and consensus system.</span></div>
+        <div class="limit"><strong>Fixed-size shaping is optional.</strong><span>Fixed-size padding is enabled only when traffic shaping is turned on.</span></div>
         <div class="limit"><strong>Fixed-size cells still expose hop position.</strong><span>The current v0.4 construction can leak structural hop-depth information, which the framework can measure explicitly.</span></div>
         <div class="limit"><strong>Relay identities are ephemeral.</strong><span>There is no persistent relay identity or reputation system.</span></div>
-        <div class="limit"><strong>Bandwidth-weighted routing is simplified.</strong><span>It does not reproduce Tor guard/exit flag constraints or positional selection rules.</span></div>
+        <div class="limit"><strong>Bandwidth-weighted routing is simplified.</strong><span>Selection is weighted without Tor guard/exit flag constraints or positional rules.</span></div>
         <div class="limit"><strong>Latency scheduling uses nominal RTTs.</strong><span>The latency split policy schedules using configured round-trip times. The legs are not given different real latencies by that policy.</span></div>
         <div class="limit"><strong>Per-edge link conditions are forward-direction only.</strong><span>Per-edge latency, jitter, loss and bandwidth settings affect the forward direction of the configured edge.</span></div>
-        <div class="limit"><strong>OCB3 depends on the host OpenSSL build.</strong><span>AES-OCB3 is available only when the host OpenSSL build includes OCB support.</span></div>
+        <div class="limit"><strong>Some AEAD options depend on the crypto backend.</strong><span>AES-GCM-SIV requires cryptography ≥ 42 with OpenSSL 3.2+. AES-OCB3 also requires an OpenSSL build with OCB support.</span></div>
         <div class="limit"><strong>Wave-mode clocks start per session.</strong><span>With <code>sessions.max_concurrent</code>, each session starts its experiment clock when that session begins. Timing comparisons should account for this.</span></div>
         <div class="limit"><strong>Measured timing varies.</strong><span>Seeds reproduce controlled choices, while real process and socket timing remains naturally variable between runs.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="license-section" id="license">
+    <div class="wrap">
+      <div class="license-card reveal">
+        <div>
+          <div class="kicker">06 / License and principle</div>
+          <h2 style="margin-top:14px">Free software by design.</h2>
+        </div>
+        <div class="license-copy">
+          <p>
+            AnonTestLab is released under the <strong>GNU General Public License v3.0 or later</strong>.
+            That choice is intentional.
+          </p>
+          <p>
+            Users are free to study it, modify it, redistribute it and build on it, while the GPL preserves those freedoms
+            for others who receive modified versions. For a research tool, that matters: experimental methods should be
+            inspectable, implementations should be challengeable, and redistributed modified versions should preserve the same freedoms.
+          </p>
+          <p>
+            The license supports practical reuse while keeping the project's free-software principles explicit.
+          </p>
+          <a class="license-link" href="https://github.com/hashtagRR/AnonTestLab/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the GPL-3.0-or-later license ↗</a>
+        </div>
       </div>
     </div>
   </section>
@@ -706,16 +786,53 @@
 </footer>
 
 <script>
-  const observer = new IntersectionObserver((entries) => {
+  const revealObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         entry.target.classList.add('in');
-        observer.unobserve(entry.target);
+        revealObserver.unobserve(entry.target);
       }
     });
   }, { threshold: 0.12 });
 
-  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+  document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+
+  const navLinks = [...document.querySelectorAll('.navlinks a[data-nav]')];
+  const trackedSections = navLinks
+    .map(link => document.getElementById(link.dataset.nav))
+    .filter(Boolean);
+
+  const setActiveNav = (id) => {
+    navLinks.forEach(link => {
+      const active = link.dataset.nav === id;
+      link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  };
+
+  const updateActiveSection = () => {
+    const headerOffset = 118;
+    const marker = window.scrollY + headerOffset;
+    let current = trackedSections[0]?.id || '';
+
+    trackedSections.forEach(section => {
+      if (section.offsetTop <= marker) current = section.id;
+    });
+
+    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 12;
+    if (nearBottom && trackedSections.length) current = trackedSections[trackedSections.length - 1].id;
+
+    setActiveNav(current);
+  };
+
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => setActiveNav(link.dataset.nav));
+  });
+
+  window.addEventListener('scroll', updateActiveSection, { passive: true });
+  window.addEventListener('resize', updateActiveSection);
+  updateActiveSection();
 </script>
 </body>
 </html>
