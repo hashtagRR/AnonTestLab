@@ -1,9 +1,8 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Google tag (gtag.js) -->
+  <meta charset="utf-8" />
+  <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B2NCMZXD5"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -12,657 +11,711 @@
 
   gtag('config', 'G-5B2NCMZXD5');
 </script>
-<title>AnonTestLab: Anonymous Protocol Emulator</title>
-<meta name="description" content="Anonymous Protocol Emulator: a real, circuit-based mix network for testing anonymous communication designs against 432 configurations of crypto, routing, traffic, and adversary models.">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f4f0e8" />
+  <meta name="description" content="AnonTestLab is a real, local network emulator and experimentation framework for evaluating anonymous communication network designs." />
+  <title>AnonTestLab | Anonymous Protocol Emulator</title>
 
-<link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #eef0ec;
-    --surface: #ffffff;
-    --surface-2: #e2e6e0;
-    --line: #c5ccc3;
-    --text: #0d1730;
-    --muted: #4c5a80;
-    --signal: #00a389;
-    --signal-soft: #00a3891f;
-    --warn: #d9670c;
-    --warn-soft: #d9670c1f;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0e1210;
-      --surface: #171d1a;
-      --surface-2: #111613;
-      --line: #2e3a34;
-      --text: #eef2fb;
-      --muted: #9baed6;
-      --signal: #16e6c4;
-      --signal-soft: #16e6c426;
-      --warn: #ffab3d;
-      --warn-soft: #ffab3d26;
+  <style>
+    :root{
+      --bg:#f4f0e8;
+      --bg-2:#ebe6db;
+      --paper:#fbfaf6;
+      --ink:#171915;
+      --muted:#66695f;
+      --line:#d7d1c5;
+      --green:#234c3b;
+      --green-2:#356a52;
+      --green-soft:#dfe8df;
+      --orange:#d56d37;
+      --orange-soft:#f2dfd3;
+      --yellow:#e7be58;
+      --black:#111310;
+      --code:#151915;
+      --white:#fff;
+      --shadow:0 22px 65px rgba(30,32,26,.09);
+      --radius:24px;
+      --max:1180px;
     }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0e1210;
-    --surface: #171d1a;
-    --surface-2: #111613;
-    --line: #2e3a34;
-    --text: #eef2fb;
-    --muted: #9baed6;
-    --signal: #16e6c4;
-    --signal-soft: #16e6c426;
-    --warn: #ffab3d;
-    --warn-soft: #ffab3d26;
-  }
 
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
-  }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(231,190,88,.12), transparent 28rem),
+        var(--bg);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height:1.55;
+    }
+    a{color:inherit;text-decoration:none}
+    button,a{ -webkit-tap-highlight-color:transparent }
+    code,pre,.mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
+    .wrap{width:min(calc(100% - 40px),var(--max));margin-inline:auto}
 
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+    .topbar{
+      position:sticky;top:0;z-index:50;
+      backdrop-filter:blur(16px);
+      background:rgba(244,240,232,.87);
+      border-bottom:1px solid rgba(23,25,21,.08);
+    }
+    nav{
+      min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:28px;
+    }
+    .brand{display:flex;align-items:center;gap:12px;font-weight:820;letter-spacing:-.03em}
+    .mark{
+      width:35px;height:35px;border:1.5px solid var(--ink);border-radius:50%;
+      display:grid;place-items:center;position:relative;background:var(--paper);
+    }
+    .mark:before,.mark:after{content:"";position:absolute;border:1.5px solid var(--ink);border-radius:50%}
+    .mark:before{width:20px;height:20px}.mark:after{width:7px;height:7px;background:var(--orange)}
+    .navlinks{display:flex;align-items:center;gap:25px;font-size:14px;color:#52564c}
+    .navlinks a:hover{color:var(--ink)}
+    .github{
+      display:inline-flex;align-items:center;gap:8px;background:var(--black);color:white;
+      padding:10px 15px;border-radius:999px;font-weight:750;
+    }
+    .menu{display:none;border:0;background:none;font-size:24px}
 
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+    .hero{padding:94px 0 64px}
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.35);
+      padding:7px 12px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    }
+    .eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--orange)}
+    h1{
+      max-width:970px;margin:25px 0 23px;
+      font-size:clamp(58px,8.1vw,115px);line-height:.88;letter-spacing:-.075em;font-weight:890;
+    }
+    h1 .outline{
+      color:transparent;-webkit-text-stroke:1.7px var(--ink);text-stroke:1.7px var(--ink);
+    }
+    .hero-bottom{display:grid;grid-template-columns:1.25fr .75fr;gap:60px;align-items:end}
+    .lede{font-size:clamp(20px,2.25vw,29px);line-height:1.28;letter-spacing:-.025em;max-width:700px}
+    .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:29px}
+    .btn{
+      padding:14px 20px;border-radius:999px;font-weight:780;font-size:14px;
+      display:inline-flex;align-items:center;gap:9px;border:1px solid var(--ink);
+      transition:.2s ease;
+    }
+    .btn.primary{background:var(--ink);color:white}
+    .btn.primary:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.13)}
+    .btn.secondary:hover{background:var(--paper)}
+    .hero-note{font-size:14px;color:var(--muted);border-left:2px solid var(--orange);padding-left:18px}
 
-  h1, h2, h3 { font-family: "Big Shoulders Display", "Arial Narrow", sans-serif; text-wrap: balance; margin: 0; letter-spacing: .01em; }
-  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    .hero-art{
+      margin:70px 0 0;border-radius:30px;overflow:hidden;background:var(--green);
+      color:#eef5ef;min-height:410px;position:relative;box-shadow:var(--shadow);
+    }
+    .grid-bg{
+      position:absolute;inset:0;opacity:.18;
+      background-image:linear-gradient(rgba(255,255,255,.15) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.15) 1px,transparent 1px);
+      background-size:48px 48px;
+    }
+    .network{position:absolute;inset:0}
+    .node{
+      position:absolute;width:56px;height:56px;border:1px solid rgba(255,255,255,.55);
+      background:rgba(255,255,255,.08);backdrop-filter:blur(4px);border-radius:50%;display:grid;place-items:center;
+      font:700 11px monospace;
+    }
+    .n1{left:8%;top:42%}.n2{left:28%;top:18%}.n3{left:28%;top:67%}.n4{left:51%;top:33%}.n5{left:51%;top:70%}.n6{right:22%;top:20%}.n7{right:8%;top:47%}
+    svg.lines{position:absolute;inset:0;width:100%;height:100%}
+    .network-label{
+      position:absolute;left:34px;bottom:28px;font-size:14px;max-width:430px;color:rgba(255,255,255,.72)
+    }
+    .network-label strong{display:block;color:white;font-size:25px;letter-spacing:-.025em;margin-bottom:5px}
 
-  a { color: var(--signal); }
+    section{padding:88px 0}
+    .section-top{display:grid;grid-template-columns:.75fr 1.25fr;gap:48px;margin-bottom:42px}
+    .kicker{font-size:12px;font-weight:850;letter-spacing:.11em;text-transform:uppercase;color:var(--green)}
+    h2{font-size:clamp(37px,5vw,68px);line-height:.96;letter-spacing:-.055em;margin:0;max-width:820px}
+    .subcopy{font-size:18px;color:var(--muted);max-width:740px;margin-top:20px}
 
-  ::selection { background: var(--signal-soft); }
+    .problem-grid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+    .problem{padding:29px 30px 10px 0;border-right:1px solid var(--line)}
+    .problem+.problem{padding-left:30px}
+    .problem:last-child{border-right:0}
+    .num{font:700 12px monospace;color:var(--orange)}
+    .problem h3,.card h3{font-size:22px;letter-spacing:-.025em;margin:18px 0 8px}
+    .problem p,.card p{color:var(--muted);margin:0}
 
-  /* ---------- topbar ---------- */
-  .topbar {
-    position: sticky; top: 0; z-index: 30;
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--line);
-  }
-  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
-  .brand { display: flex; align-items: baseline; gap: 8px; font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 1.3rem; letter-spacing: .02em; }
-  .brand .dot { color: var(--signal); }
-  .nav { display: flex; gap: 22px; font-family: "IBM Plex Mono", monospace; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
-  .nav a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; padding-bottom: 3px; }
-  .nav a:hover { color: var(--text); border-color: var(--signal); }
-  .nav .gh { color: var(--text); }
-  @media (max-width: 720px) { .nav a:not(.gh) { display: none; } }
+    .statement{
+      background:var(--black);color:#f6f4ec;padding:86px 0;
+    }
+    .statement blockquote{
+      margin:0;font-size:clamp(40px,5.8vw,77px);line-height:1.02;letter-spacing:-.05em;max-width:1030px;
+    }
+    .statement .accent{color:#d88a5e}
+    .statement small{display:block;margin-top:30px;color:#9fa69d;font-size:14px}
 
-  /* ---------- corner-bracket registration marks ---------- */
-  .instrument { position: relative; }
-  .instrument::before, .instrument::after,
-  .instrument > .br-tr, .instrument > .br-br {
-    content: ""; position: absolute; width: 14px; height: 14px;
-    border-color: var(--signal); opacity: .8;
-  }
-  .instrument::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
-  .instrument > .br-tr { top: -1px; right: -1px; border-top: 2px solid; border-right: 2px solid; }
-  .instrument::after { bottom: -1px; left: -1px; border-bottom: 2px solid; border-left: 2px solid; }
-  .instrument > .br-br { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
-  @keyframes focus-in { from { opacity: 0; transform: scale(1.4); } to { opacity: .8; transform: scale(1); } }
-  .instrument.animate::before, .instrument.animate::after,
-  .instrument.animate > .br-tr, .instrument.animate > .br-br { animation: focus-in .5s ease-out both; }
-  .instrument.animate::after { animation-delay: .06s; }
-  .instrument.animate > .br-tr { animation-delay: .03s; }
-  .instrument.animate > .br-br { animation-delay: .09s; }
+    .cap-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+    .card{
+      background:rgba(251,250,246,.76);border:1px solid var(--line);border-radius:var(--radius);
+      padding:30px;min-height:285px;position:relative;overflow:hidden;
+    }
+    .card:hover{border-color:#b6afa2}
+    .icon{
+      width:44px;height:44px;border-radius:14px;background:var(--green-soft);display:grid;place-items:center;
+      font-size:20px;
+    }
+    .card ul{padding:0;margin:22px 0 0;list-style:none;display:grid;gap:9px;color:#454a41;font-size:14px}
+    .card li:before{content:"•";color:var(--cyan);margin-right:9px}
+    .micro-note{margin-top:18px!important;font-size:12px!important;color:var(--muted-2)!important}
 
-  .eyebrow {
-    font-family: "IBM Plex Mono", monospace; font-size: .78rem; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--signal); display: flex; align-items: center; gap: 10px;
-    margin-bottom: 14px;
-  }
-  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--signal); display: inline-block; }
+    .workflow{
+      padding:38px;border-radius:28px;background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow)
+    }
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:30px}
+    .step{
+      min-height:185px;padding:20px;border:1px solid var(--line);border-radius:18px;background:#f7f4ed;
+      display:flex;flex-direction:column;justify-content:space-between;
+    }
+    .step b{font-size:16px}.step span{font-size:12px;color:var(--muted)}
+    .step code{font-size:11px;color:var(--green)}
 
-  section { padding: 84px 0; border-bottom: 1px solid var(--line); }
-  section:last-of-type { border-bottom: none; }
+    .codepanel{
+      background:var(--code);border-radius:26px;color:#e9eee7;overflow:hidden;box-shadow:var(--shadow)
+    }
+    .codehead{
+      height:50px;border-bottom:1px solid #303630;display:flex;align-items:center;gap:7px;padding:0 19px;color:#99a39b;font-size:12px
+    }
+    .dot{width:9px;height:9px;border-radius:50%;background:#4d554e}.dot:nth-child(1){background:#d36b48}.dot:nth-child(2){background:#d5ab45}.dot:nth-child(3){background:#4d9b68}
+    pre{margin:0;padding:27px;overflow:auto;font-size:13px;line-height:1.7}
+    .y{color:#d4bb71}.g{color:#86bd96}.b{color:#95b9d9}.o{color:#da8e67}.m{color:#a4aba3}
 
-  /* ---------- hero ---------- */
-  .hero { padding-top: 64px; }
-  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: start; }
-  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
-  .hero h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 900; line-height: 1.02; }
-  .hero h1 .accent { color: var(--signal); }
-  .hero p.lede { font-size: 1.12rem; color: var(--muted); max-width: 46ch; margin-top: 20px; }
-  .hero-facts { display: flex; gap: 28px; margin-top: 32px; flex-wrap: wrap; }
-  .fact .num { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 2rem; line-height: 1; color: var(--signal); font-variant-numeric: tabular-nums; }
-  .fact .label { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:start}
+    .feature-list{display:grid;gap:10px}
+    .feature-row{
+      display:grid;grid-template-columns:155px 1fr;gap:22px;padding:16px 0;border-bottom:1px solid var(--line)
+    }
+    .feature-row strong{font-size:14px}.feature-row span{font-size:14px;color:var(--muted)}
 
-  .term {
-    background: #0b0f0d; color: #dce4de; border: 1px solid var(--line);
-    padding: 20px 22px; font-family: "IBM Plex Mono", monospace; font-size: .82rem;
-    overflow-x: auto; white-space: pre;
-  }
-  .term .head { display: flex; gap: 6px; margin-bottom: 14px; }
-  .term .head span { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #2a332e; }
-  .term .dim { color: #7c8c82; }
-  .term .ok { color: #16e6c4; }
-  .term .rule { color: #2a332e; }
+    .research{
+      background:var(--orange-soft);
+      border-top:1px solid #dfc6b8;border-bottom:1px solid #dfc6b8;
+    }
+    .questions{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .question{padding:24px;border-radius:18px;background:rgba(255,255,255,.34);border:1px solid rgba(78,48,31,.14)}
+    .question small{font:700 11px monospace;text-transform:uppercase;color:#9d552e}
+    .question p{font-size:20px;letter-spacing:-.02em;margin:12px 0 0}
 
-  /* ---------- pipeline ---------- */
-  .pipeline { display: flex; flex-direction: column; gap: 0; margin-top: 40px; }
-  .step { display: grid; grid-template-columns: 64px 1fr; gap: 22px; position: relative; padding-bottom: 36px; }
-  .step:last-child { padding-bottom: 0; }
-  .step .idx {
-    font-family: "Big Shoulders Display", sans-serif; font-weight: 900; font-size: 1.6rem;
-    color: var(--bg); background: var(--signal); width: 44px; height: 44px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; z-index: 1;
-  }
-  .step::before {
-    content: ""; position: absolute; left: 21px; top: 44px; bottom: -14px; width: 2px;
-    background: var(--line);
-  }
-  .step:last-child::before { display: none; }
-  .step h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 6px; }
-  .step p { color: var(--muted); margin: 0; max-width: 62ch; }
-  .step code { color: var(--signal); background: var(--signal-soft); padding: .1em .4em; }
+    .limits{display:grid;grid-template-columns:.85fr 1.15fr;gap:58px}
+    .limits-list{display:grid;gap:0}
+    .limit{padding:18px 0;border-bottom:1px solid var(--line)}
+    .limit strong{display:block;margin-bottom:4px}
+    .limit span{color:var(--muted);font-size:14px}
 
-  /* ---------- live circuit diagram ---------- */
-  .circuit-diagram { margin-top: 8px; margin-bottom: 44px; border: 1px solid var(--line); background: var(--surface); padding: 22px 22px 14px; }
-  .circuit-diagram svg { width: 100%; height: auto; display: block; overflow: visible; }
-  .cd-pool-line { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; opacity: .5; }
-  .cd-pool-dot { fill: var(--line); }
-  .cd-path { fill: none; stroke: var(--signal); stroke-width: 2; opacity: .45; }
-  .cd-node { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
-  .cd-node.is-active { stroke: var(--signal); }
-  .cd-node.is-end { stroke: var(--muted); }
-  .cd-label { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--muted); letter-spacing: .02em; }
-  .cd-packet { animation: cd-travel 9s linear infinite; }
-  @keyframes cd-travel {
-    0%   { transform: translate(30px, 112px); }
-    25%  { transform: translate(272px, 54px); }
-    50%  { transform: translate(512px, 168px); }
-    75%  { transform: translate(754px, 54px); }
-    100% { transform: translate(972px, 112px); }
-  }
-  .cd-ring { fill: none; stroke: var(--signal); }
-  .cd-ring1 { animation: cd-shed1 9s linear infinite; }
-  .cd-ring2 { animation: cd-shed2 9s linear infinite; }
-  .cd-ring3 { animation: cd-shed3 9s linear infinite; }
-  @keyframes cd-shed1 { 0%, 23% { opacity: .85; } 26%, 100% { opacity: 0; } }
-  @keyframes cd-shed2 { 0%, 48% { opacity: .65; } 51%, 100% { opacity: 0; } }
-  @keyframes cd-shed3 { 0%, 73% { opacity: .5; } 76%, 100% { opacity: 0; } }
-  .cd-core { fill: var(--signal); }
-  @media (prefers-reduced-motion: reduce) {
-    .cd-packet { animation: none !important; transform: translate(370px, 100px); }
-    .cd-ring1 { opacity: 0; }
-    .cd-ring2 { opacity: .65; }
-    .cd-ring3 { opacity: .5; }
-  }
-  .cd-legend { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .cd-legend span { font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--muted); display: flex; align-items: center; gap: 7px; }
-  .cd-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .cta{
+      margin:70px auto;background:var(--green);color:white;border-radius:32px;padding:58px;
+      display:flex;justify-content:space-between;gap:35px;align-items:end;overflow:hidden;position:relative;
+    }
+    .cta h2{max-width:700px}.cta p{color:#cbd8cf;max-width:610px;font-size:16px}
+    .cta .btn{border-color:white;background:white;color:var(--green);white-space:nowrap}
 
-  /* ---------- contributions ---------- */
-  .contrib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
-  @media (max-width: 900px) { .contrib-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 620px) { .contrib-grid { grid-template-columns: 1fr; } }
-  .contrib { background: var(--surface); border: 1px solid var(--line); padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; }
-  .contrib .tag { font-family: "IBM Plex Mono", monospace; font-size: .68rem; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
-  .contrib .tag code { color: var(--signal); }
-  .contrib h3 { font-size: 1.05rem; font-weight: 700; font-family: "IBM Plex Sans", sans-serif; }
-  .contrib p { color: var(--muted); font-size: .93rem; margin: 0; }
+    footer{padding:0 0 45px}
+    .footerline{
+      border-top:1px solid var(--line);padding-top:25px;display:flex;justify-content:space-between;gap:25px;color:var(--muted);font-size:13px
+    }
 
-  /* ---------- spec tables ---------- */
-  .spec-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
-  @media (max-width: 780px) { .spec-cols { grid-template-columns: 1fr; } }
-  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-  caption { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-bottom: 10px; }
-  th { text-align: left; font-family: "IBM Plex Mono", monospace; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
-  td { padding: 10px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  td:first-child, th:first-child { padding-left: 0; }
-  tr:last-child td { border-bottom: none; }
-  .cellname { font-family: "IBM Plex Mono", monospace; color: var(--signal); font-weight: 500; }
-  .tablewrap { overflow-x: auto; }
+    .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+    .reveal.in{opacity:1;transform:none}
 
-  /* ---------- limitations ---------- */
-  .disclosure {
-    background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn);
-    padding: 28px 30px; margin-top: 36px;
-  }
-  .disclosure h3 { font-family: "IBM Plex Mono", monospace; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); font-weight: 600; margin-bottom: 18px; }
-  .disclosure ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px; }
-  .disclosure li { padding-left: 22px; position: relative; color: var(--muted); font-size: .95rem; }
-  .disclosure li::before { content: "◇"; position: absolute; left: 0; color: var(--warn); font-size: .8rem; top: .2em; }
-  .disclosure li b { color: var(--text); font-weight: 600; }
-  .disclosure li code { color: var(--text); background: var(--surface-2); padding: .05em .35em; }
+    @media(max-width:900px){
+      .navlinks a:not(.github){display:none}
+      .hero{padding-top:65px}
+      .hero-bottom,.section-top,.split,.limits{grid-template-columns:1fr}
+      .problem-grid,.cap-grid,.questions{grid-template-columns:1fr}
+      .problem,.problem+.problem{padding:24px 0;border-right:0;border-bottom:1px solid var(--line)}
+      .flow{grid-template-columns:1fr 1fr}
+      .cta{align-items:flex-start;flex-direction:column}
+    }
+    @media(max-width:600px){
+      .wrap{width:min(calc(100% - 24px),var(--max))}
+      h1{font-size:57px}
+      .hero-art{min-height:340px}
+      .node{width:43px;height:43px;font-size:9px}
+      .flow{grid-template-columns:1fr}
+      .workflow{padding:20px}
+      .feature-row{grid-template-columns:1fr;gap:5px}
+      .cta{padding:35px 25px}
+      section{padding:66px 0}
+      .footerline{flex-direction:column}
+    }
+  
 
-  /* ---------- footer ---------- */
-  footer { padding: 64px 0 56px; }
-  .footer-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 40px; }
-  @media (max-width: 780px) { .footer-grid { grid-template-columns: 1fr; gap: 32px; } }
-  footer h4 { font-family: "IBM Plex Mono", monospace; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-  footer .install {
-    background: var(--surface-2); border: 1px solid var(--line); padding: 16px 18px;
-    font-family: "IBM Plex Mono", monospace; font-size: .82rem; color: var(--text);
-    white-space: pre-line; line-height: 1.8;
-  }
-  footer .install .prompt { color: var(--signal); }
-  footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-  footer a { color: var(--muted); text-decoration: none; font-size: .92rem; }
-  footer a:hover { color: var(--signal); }
-  .foot-bottom { margin-top: 48px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-family: "IBM Plex Mono", monospace; font-size: .76rem; color: var(--muted); }
+    /* v3: darker research-oriented theme */
+    :root{--bg:#09111f;--bg-2:#0d1627;--paper:#111c30;--ink:#eef4ff;--muted:#94a3bd;--line:rgba(255,255,255,.09);--green:#5ed7ff;--green-2:#6ea8ff;--green-soft:rgba(94,215,255,.10);--orange:#8c83ff;--orange-soft:#121a31;--yellow:#61e6bf;--black:#070d17;--code:#080f1b;--white:#fff;--shadow:0 25px 70px rgba(0,0,0,.30)}
+    body{background:radial-gradient(circle at 13% 0%,rgba(94,215,255,.12),transparent 28rem),radial-gradient(circle at 87% 12%,rgba(140,131,255,.11),transparent 24rem),linear-gradient(180deg,#09111f,#0a1221 55%,#09111f);color:var(--ink)}
+    .topbar{background:rgba(8,15,28,.78);border-bottom-color:rgba(255,255,255,.06)}
+    .mark{border-color:rgba(255,255,255,.18);background:#101d32}.mark:before,.mark:after{border-color:#84ddff}.mark:after{background:#8c83ff}
+    .navlinks{color:#9aabc5}.github{background:linear-gradient(135deg,#5ed7ff,#8c83ff);color:#07101c}
+    .eyebrow{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.08)}.eyebrow i{background:#5ed7ff}
+    h1 .outline{color:transparent;-webkit-text-stroke:1.4px #7bdcff}
+    .lede{color:#dfe9fa}.hero-note{color:#98a8c0;border-left-color:#5ed7ff}
+    .btn.primary{background:linear-gradient(135deg,#5ed7ff,#8c83ff);color:#07101c;border:0}.btn.secondary{border-color:rgba(255,255,255,.13)}
+    .kicker{color:#72dcff}.subcopy,.problem p,.card p{color:#94a3bd}
+    .problem,.card,.workflow{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border-color:rgba(255,255,255,.08)}
+    .problem-grid{border-top:0;gap:16px}.problem{padding:28px;border-right:1px solid rgba(255,255,255,.08);border-radius:22px}.problem+.problem{padding-left:28px}.num{color:#8c83ff}
+    .statement{background:linear-gradient(180deg,#0d1728,#10192c);border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}.statement .accent{color:#72dcff}.statement small{color:#8fa0ba}
+    .card ul{color:#cbd6e7}.card li:before{color:#5ed7ff}.icon{background:rgba(94,215,255,.10);border:1px solid rgba(94,215,255,.16)}
+    .step{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.07)}.step span{color:#94a3bd}.step code{color:#72dcff}
+    .codepanel{background:#070e1a;border:1px solid rgba(255,255,255,.07)}.codehead{border-bottom-color:rgba(255,255,255,.08)}
+    .feature-row,.limit{border-bottom-color:rgba(255,255,255,.08)}.feature-row span,.limit span{color:#94a3bd}
+    .research{background:linear-gradient(180deg,#0e1729,#11192d);border-color:rgba(255,255,255,.06)}.question{background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.07)}.question small{color:#72dcff}
+    .cta{background:radial-gradient(circle at 10% 10%,rgba(94,215,255,.13),transparent 16rem),radial-gradient(circle at 90% 90%,rgba(140,131,255,.13),transparent 18rem),linear-gradient(180deg,#121e33,#0e1729);border:1px solid rgba(255,255,255,.08)}
+    .footerline{border-top-color:rgba(255,255,255,.08)}
 
-  .cta-row { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px;
-    font-family: "IBM Plex Mono", monospace; font-size: .82rem; letter-spacing: .03em;
-    text-decoration: none; border: 1px solid var(--line); color: var(--text);
-  }
-  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .btn:hover { border-color: var(--signal); color: var(--signal); }
-  .btn.primary:hover { color: var(--bg); background: var(--signal); border-color: var(--signal); }
+    .mix-art{background:radial-gradient(circle at 50% 50%,rgba(94,215,255,.07),transparent 26rem),#0b1527;border:1px solid rgba(255,255,255,.08);min-height:430px}
+    .mix-art:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:42px 42px}
+    .mix-svg{position:absolute;inset:22px 0 56px;width:100%;height:calc(100% - 96px)}
+    .mix-topline{position:absolute;z-index:3;left:25px;right:25px;top:18px;display:flex;justify-content:center;color:#8ea1bd;font:700 11px monospace;letter-spacing:.07em;text-transform:uppercase}
+    .possible path{fill:none;stroke:rgba(255,255,255,.18);stroke-width:1.8;stroke-dasharray:7 10;animation:dash 8s linear infinite;stroke-linecap:round;stroke-linejoin:round}.route{fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;filter:url(#glowC)}.route-a{stroke:#5ed7ff}.route-b{stroke:#8c83ff}
+    .route-joint{fill:none;stroke:rgba(255,255,255,.14);stroke-width:2.2;stroke-dasharray:2 12;stroke-linecap:round}
+    @keyframes dash{to{stroke-dashoffset:-120}}
+    .nodes circle{fill:#101d32;stroke:rgba(255,255,255,.22);stroke-width:2}.nodes .endpoint{fill:#162945;stroke:#77ddff}.nodes .ghost{fill:#10182a;stroke:rgba(255,255,255,.14)}.nodes text{fill:#eaf3ff;font-size:11px;font-weight:800;text-anchor:middle;font-family:monospace}.nodes .endpoint-label{font-size:12px}.nodes .endpoint-sub{fill:#9cb4d9;font-size:9px;font-weight:700}
+    .packet-a{fill:#8ae8ff;filter:url(#glowC)}.packet-b{fill:#9a91ff;filter:url(#glowC)}.packet-x{fill:rgba(255,255,255,.78)}
+    .mix-caption{position:absolute;left:26px;right:26px;bottom:18px;display:flex;justify-content:space-between;gap:18px;align-items:flex-end}.mix-caption strong{display:block;font-size:18px;line-height:1.2;max-width:660px}.mix-caption span{display:block;color:#aabbd5;font-size:13px;max-width:360px}
+    @media(max-width:600px){.need-points{grid-template-columns:1fr}.mix-art{min-height:390px}.mix-caption{flex-direction:column;align-items:flex-start}.mix-caption strong{font-size:15px}.mix-topline span:nth-child(2){display:none}}
+    .why-lead{margin:0 0 24px;padding:24px 28px;border:1px solid rgba(94,215,255,.13);background:rgba(94,215,255,.045);border-radius:20px;display:grid;grid-template-columns:.7fr 1.3fr;gap:30px;align-items:center}.why-big{font-size:24px;line-height:1.1;font-weight:850;letter-spacing:-.03em}.why-lead p{margin:0;color:#b8c7dd;font-size:17px}.why-lead strong{color:#7ee2ff}
+    .need-panel{margin-top:20px;display:grid;grid-template-columns:1.05fr .95fr;gap:36px;padding:36px;border:1px solid rgba(255,255,255,.08);border-radius:26px;background:radial-gradient(circle at 0 0,rgba(94,215,255,.09),transparent 20rem),rgba(255,255,255,.025)}.need-copy h3{font-size:clamp(29px,3.5vw,44px);line-height:1.04;letter-spacing:-.045em;margin:12px 0 20px}.need-copy p{color:#98a8c0;margin:0 0 14px}.need-points{display:grid;grid-template-columns:1fr 1fr;gap:10px}.need-point{padding:17px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(255,255,255,.03)}.need-point strong{display:block;color:#edf5ff;margin-bottom:6px}.need-point span{color:#91a2bc;font-size:13px}.answer-strip{margin-top:18px;padding:24px 28px;border-left:3px solid #5ed7ff;background:rgba(94,215,255,.04);border-radius:0 18px 18px 0;display:grid;grid-template-columns:.42fr 1.58fr;gap:30px}.answer-strip>span{color:#7ee2ff;font-weight:850}.answer-strip p{margin:0;color:#bac8dc}.answer-strip strong{color:#eef6ff}
+
+    @media(max-width:900px){.why-lead,.need-panel,.answer-strip{grid-template-columns:1fr}.need-points{grid-template-columns:1fr 1fr}.mix-caption{flex-direction:column;align-items:flex-start}.mix-caption span{text-align:left}.problem,.problem+.problem{padding:24px}}
+    @media(max-width:600px){.need-points{grid-template-columns:1fr}.mix-art{min-height:390px}.mix-caption strong{font-size:15px}.mix-topline span:nth-child(2){display:none}}
+
 </style>
 </head>
-<body>
 
-<div class="topbar">
+<body>
+<header class="topbar">
   <div class="wrap">
-    <div class="brand">AnonTestLab<span class="dot">.</span></div>
-    <nav class="nav">
-      <a href="#why">Why</a>
-      <a href="#pipeline">Pipeline</a>
-      <a href="#contributions">Contributions</a>
-      <a href="#spec">Spec</a>
-      <a href="#limitations">Limitations</a>
-      <a class="gh" href="https://github.com/hashtagRR/AnonTestLab">GitHub &rarr;</a>
+    <nav>
+      <a class="brand" href="#top" aria-label="AnonTestLab home">
+        <span class="mark" aria-hidden="true"></span>
+        <span>AnonTestLab</span>
+      </a>
+      <div class="navlinks">
+        <a href="#why">Why</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#research">Research</a>
+        <a href="#limitations">Limitations</a>
+        <a class="github" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </div>
     </nav>
   </div>
-</div>
+</header>
 
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-grid">
-      <div>
-        <div class="eyebrow">Research tool for anonymous communication networks</div>
-        <h1>Anonymous Protocol<br><span class="accent">Emulator.</span></h1>
-        <p class="lede">
-          A real, circuit-based mix network for testing anonymous communication
-          designs against 432 configurations of crypto, routing, traffic, and
-          adversary models, with OS processes and sockets standing in for the
-          network instead of a discrete-event approximation.
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="eyebrow"><i></i> Research tool for anonymous communication networks</div>
+      <h1>Anonymous protocol <span class="outline">experiments</span>, made observable.</h1>
+
+      <div class="hero-bottom">
+        <div>
+          <p class="lede">
+            AnonTestLab is a local network emulator for evaluating anonymous communication designs with
+            <strong>real relay processes, real sockets, real per-hop cryptography</strong> and configurable adversaries.
+          </p>
+          <div class="hero-actions">
+            <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">View on GitHub ↗</a>
+            <a class="btn secondary" href="#workflow">See how it works ↓</a>
+          </div>
+        </div>
+        <p class="hero-note">
+          A reusable middle ground between abstract simulation and modifying a production anonymity network. Controlled enough for experiments, concrete enough to observe a running protocol.
         </p>
-        <div class="cta-row">
-          <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab">View the source</a>
-          <a class="btn" href="#spec">See the test matrix</a>
+      </div>
+
+      <div class="hero-art mix-art" aria-label="Animated multipath mix network diagram">
+        <div class="mix-topline">
+          <span>two independent 3-hop paths with additional possible relay combinations</span>
         </div>
-        <div class="hero-facts">
-          <div class="fact"><div class="num">432</div><div class="label">testable configurations</div></div>
-          <div class="fact"><div class="num">6&times;3</div><div class="label">AEAD ciphers &times; ECDHE curves</div></div>
-          <div class="fact"><div class="num">4</div><div class="label">pluggable adversaries</div></div>
-          <div class="fact"><div class="num">254</div><div class="label">addressable relay processes</div></div>
+        <svg class="mix-svg" viewBox="0 0 1180 410" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <filter id="glowC"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <path id="pathA" d="M110,205 L290,120 L500,120 L710,120 L1070,205"/>
+            <path id="pathB" d="M110,205 L290,290 L500,290 L710,290 L1070,205"/>
+            <path id="pathX1" d="M110,205 L390,205 L710,120 L1070,205"/>
+            <path id="pathX2" d="M110,205 L390,205 L710,290 L1070,205"/>
+          </defs>
+
+          <g class="possible">
+            <path d="M110,205 L390,205 L500,120 L850,150 L1070,205"/>
+            <path d="M110,205 L390,205 L500,290 L850,260 L1070,205"/>
+            <path d="M290,120 L390,205 L500,290"/>
+            <path d="M290,290 L390,205 L500,120"/>
+            <path d="M500,120 L610,205 L710,290"/>
+            <path d="M500,290 L610,205 L710,120"/>
+            <path d="M710,120 L850,150 L1070,205"/>
+            <path d="M710,290 L850,260 L1070,205"/>
+          </g>
+
+          <path class="route route-a" d="M110,205 L290,120 L500,120 L710,120 L1070,205"/>
+          <path class="route route-b" d="M110,205 L290,290 L500,290 L710,290 L1070,205"/>
+          <path class="route-joint" d="M110,205 L1070,205"/>
+
+          <g class="nodes">
+            <circle class="endpoint" cx="110" cy="205" r="33"/>
+            <text class="endpoint-label" x="110" y="201">ENTRY</text>
+            <text class="endpoint-sub" x="110" y="216">client</text>
+
+            <circle cx="290" cy="120" r="23"/><text x="290" y="125">A1</text>
+            <circle cx="500" cy="120" r="23"/><text x="500" y="125">A2</text>
+            <circle cx="710" cy="120" r="23"/><text x="710" y="125">A3</text>
+
+            <circle cx="290" cy="290" r="23"/><text x="290" y="295">B1</text>
+            <circle cx="500" cy="290" r="23"/><text x="500" y="295">B2</text>
+            <circle cx="710" cy="290" r="23"/><text x="710" y="295">B3</text>
+
+            <circle class="ghost" cx="390" cy="205" r="18"/><text x="390" y="210">M1</text>
+            <circle class="ghost" cx="610" cy="205" r="18"/><text x="610" y="210">M2</text>
+            <circle class="ghost" cx="850" cy="150" r="18"/><text x="850" y="155">M3</text>
+            <circle class="ghost" cx="850" cy="260" r="18"/><text x="850" y="265">M4</text>
+
+            <circle class="endpoint" cx="1070" cy="205" r="33"/>
+            <text class="endpoint-label" x="1070" y="201">EXIT</text>
+            <text class="endpoint-sub" x="1070" y="216">destination</text>
+          </g>
+
+          <circle class="packet packet-a" r="6"><animateMotion dur="4.4s" repeatCount="indefinite"><mpath href="#pathA"/></animateMotion></circle>
+          <circle class="packet packet-a" r="6" opacity=".65"><animateMotion dur="4.4s" begin="-1.5s" repeatCount="indefinite"><mpath href="#pathA"/></animateMotion></circle>
+          <circle class="packet packet-b" r="6"><animateMotion dur="4.8s" repeatCount="indefinite"><mpath href="#pathB"/></animateMotion></circle>
+          <circle class="packet packet-b" r="6" opacity=".65"><animateMotion dur="4.8s" begin="-1.7s" repeatCount="indefinite"><mpath href="#pathB"/></animateMotion></circle>
+          <circle class="packet packet-x" r="4" opacity=".7"><animateMotion dur="5.6s" repeatCount="indefinite"><mpath href="#pathX1"/></animateMotion></circle>
+          <circle class="packet packet-x" r="4" opacity=".55"><animateMotion dur="5.9s" begin="-2.2s" repeatCount="indefinite"><mpath href="#pathX2"/></animateMotion></circle>
+        </svg>
+        <div class="mix-caption">
+          <strong>One session split over two relay paths. The adversary may see one leg, both, or neither.</strong>
+          <span>Bright routes show the selected paths. Dashed links show other relay combinations available to the experiment.</span>
         </div>
       </div>
-      <div class="instrument animate">
-        <span class="br-tr"></span><span class="br-br"></span>
-        <div class="term">
-<div class="head"><span></span><span></span><span></span></div>Running tor-like...
-  10 relays ready
-  session 1/10 complete (37/37 real delivered, build 34ms)
-  session 2/10 complete (37/37 real delivered, build 29ms)
-  ...
-
-Results for tor-like
-<span class="rule">────────────────────────────────────────</span>
-real_packets_sent              375
-delivery_rate                  <span class="ok">1.0000</span>
-avg_latency_s                  0.0006  <span class="dim">&lt;- real measured latency</span>
-circuit_build_delay_s          0.0315  <span class="dim">&lt;- real measured handshake</span>
-correlation_success_rate       1.0000
-auc                            1.0000
-precision                      1.0000
-recall                         1.0000</div>
-      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="why">
-  <div class="wrap">
-    <div class="eyebrow">01 &middot; why this exists</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:36ch;">A gap between two things that already exist</h2>
-    <p style="color:var(--muted); max-width:68ch; margin-top:14px; font-size:1.02rem;">
-      Most anonymity-network research runs on a discrete-event simulator: fast,
-      but every latency number and every crypto cost is a distribution someone
-      had to assume first. The alternative is running the real Tor codebase,
-      where every cost is real, but instrumenting one adversary experiment
-      means patching production software built for a different job. AnonTestLab
-      sits between them: real relay processes, real sockets, a real ECDHE
-      handshake and AEAD encryption per hop, built from the ground up as a
-      research harness where any single dial, cipher, curve, routing strategy,
-      traffic shape, WAN condition, adversary, is one YAML field, and a full
-      run takes seconds.
-    </p>
-    <p style="color:var(--muted); max-width:68ch; margin-top:18px; font-size:1.02rem;">
-      It's a <b style="color:var(--text);">low-latency, circuit-based mix network</b>:
-      Tor's telescoping onion-routing design, where each relay (a mix node)
-      strips exactly one encryption layer and forwards, as opposed to the
-      high-latency batch-and-shuffle mixnets built for anonymous email. That's
-      the specific design point every measurement on this page is testing.
-    </p>
-    <div class="contrib-grid" style="margin-top:36px; grid-template-columns: repeat(3, 1fr);">
-      <div class="contrib">
-        <div class="tag">Discrete-event simulator</div>
-        <h3>Fast, with assumed costs</h3>
-        <p>Latency, handshake cost and crypto overhead are numbers someone chose, so a changed assumption changes the answer without any new measurement.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">Running real Tor</div>
-        <h3>Measured, but costly to change</h3>
-        <p>Costs are measured, but a new adversary or a swapped cipher means patching production software that was never built for experiments.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">AnonTestLab</div>
-        <h3>Measured and configurable</h3>
-        <p>Relays, sockets and crypto run for real, and each experimental axis is a config field, so a study needs no fork of the code.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="pipeline">
-  <div class="wrap">
-    <div class="eyebrow">02 &middot; how a session runs</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Five stages, each run for real</h2>
-
-    <div class="circuit-diagram">
-      <svg viewBox="0 0 1000 220" role="img" aria-label="Animated diagram of a telescoping onion circuit: a packet travels from the client through three relays to the exit, shedding one encryption layer per hop, while other relays in the addressable pool sit unused.">
-        <line class="cd-pool-line" x1="30" y1="112" x2="150" y2="190"/>
-        <line class="cd-pool-line" x1="30" y1="112" x2="110" y2="35"/>
-        <line class="cd-pool-line" x1="272" y1="54" x2="392" y2="20"/>
-        <line class="cd-pool-line" x1="512" y1="168" x2="632" y2="195"/>
-        <line class="cd-pool-line" x1="754" y1="54" x2="900" y2="25"/>
-        <line class="cd-pool-line" x1="972" y1="112" x2="860" y2="175"/>
-        <circle class="cd-pool-dot" cx="150" cy="190" r="4"/>
-        <circle class="cd-pool-dot" cx="110" cy="35" r="4"/>
-        <circle class="cd-pool-dot" cx="392" cy="20" r="4"/>
-        <circle class="cd-pool-dot" cx="632" cy="195" r="4"/>
-        <circle class="cd-pool-dot" cx="900" cy="25" r="4"/>
-        <circle class="cd-pool-dot" cx="860" cy="175" r="4"/>
-
-        <polyline class="cd-path" points="30,112 272,54 512,168 754,54 972,112"/>
-
-        <circle class="cd-node is-end" cx="30" cy="112" r="12"/>
-        <text class="cd-label" x="30" y="140" text-anchor="middle">CLIENT</text>
-
-        <circle class="cd-node is-active" cx="272" cy="54" r="12"/>
-        <text class="cd-label" x="272" y="30" text-anchor="middle">n2</text>
-
-        <circle class="cd-node is-active" cx="512" cy="168" r="12"/>
-        <text class="cd-label" x="512" y="200" text-anchor="middle">n5</text>
-
-        <circle class="cd-node is-active" cx="754" cy="54" r="12"/>
-        <text class="cd-label" x="754" y="30" text-anchor="middle">n8</text>
-
-        <circle class="cd-node is-end" cx="972" cy="112" r="12"/>
-        <text class="cd-label" x="960" y="140" text-anchor="middle">SERVER</text>
-
-        <g class="cd-packet">
-          <circle class="cd-ring cd-ring1" cx="0" cy="0" r="13"/>
-          <circle class="cd-ring cd-ring2" cx="0" cy="0" r="9"/>
-          <circle class="cd-ring cd-ring3" cx="0" cy="0" r="5.5"/>
-          <circle class="cd-core" cx="0" cy="0" r="4"/>
-        </g>
-      </svg>
-      <div class="cd-legend">
-        <span><i style="background:var(--signal)"></i>active circuit (this session's 3 hops)</span>
-        <span><i style="background:var(--line)"></i>other addressable relays, unused this session</span>
-        <span>rings = onion layers, one sheds per hop</span>
-      </div>
-    </div>
-
-    <div class="pipeline">
-      <div class="step">
-        <div class="idx">1</div>
+  <section id="why">
+    <div class="wrap">
+      <div class="section-top reveal">
+        <div class="kicker">01 / Why this exists</div>
         <div>
-          <h3>YAML becomes an <code>ExperimentConfig</code></h3>
-          <p>Every dimension (topology, routing, traffic shape, crypto, WAN conditions, adversary) is one validated, reproducible config object, seeded once.</p>
+          <h2>Anonymous-network ideas are difficult to compare fairly.</h2>
+          <p class="subcopy">
+            A new anonymity mechanism can look promising for many different reasons: the protocol itself, the simulator assumptions,
+            the traffic model, the topology, the attacker visibility, or simply the way the prototype was built. Across studies,
+            those variables are often bundled together.
+          </p>
         </div>
       </div>
-      <div class="step">
-        <div class="idx">2</div>
+
+      <div class="why-lead reveal">
+        <span class="why-big">Many anonymity mechanisms are difficult to compare on equal terms.</span>
+        <p>A common experimental environment makes it possible to <strong>execute, vary and challenge those ideas under the same rules.</strong></p>
+      </div>
+
+      <div class="problem-grid reveal">
+        <article class="problem">
+          <span class="num">01</span>
+          <h3>Simulation abstracts away execution.</h3>
+          <p>
+            Simulation is powerful for controlled studies, but process scheduling, socket behavior, cryptographic work and implementation timing
+            may be represented by models rather than observed from a running protocol.
+          </p>
+        </article>
+        <article class="problem">
+          <span class="num">02</span>
+          <h3>Production systems are costly to repurpose.</h3>
+          <p>
+            Testing one new routing policy, mixing defense or observer model inside a mature anonymity network can require substantial engineering
+            before the research question itself can be isolated.
+          </p>
+        </article>
+        <article class="problem">
+          <span class="num">03</span>
+          <h3>One-off prototypes make comparison difficult.</h3>
+          <p>
+            If each study builds a new harness, changes in topology, workload, timing and adversary assumptions can become entangled with the mechanism being evaluated.
+          </p>
+        </article>
+      </div>
+
+      <div class="need-panel reveal">
+        <div class="need-copy">
+          <div class="kicker">The missing middle layer</div>
+          <h3>A reusable environment between abstract simulation and a production anonymity network.</h3>
+          <p>
+            Researchers should be able to change one experimental assumption at a time: routing, path splitting, cover traffic,
+            relay mixing, cryptography, link conditions or attacker visibility. The rest of the environment should stay controlled.
+          </p>
+          <p>
+            And when execution matters, the measurements should be able to come from real relay processes, sockets, circuit construction
+            and per-hop cryptography rather than only from a synthetic timing model.
+          </p>
+        </div>
+        <div class="need-points">
+          <div class="need-point"><strong>Comparable</strong><span>Test different mechanisms in the same environment.</span></div>
+          <div class="need-point"><strong>Configurable</strong><span>Change research variables instead of rewriting infrastructure.</span></div>
+          <div class="need-point"><strong>Observable</strong><span>Measure an executing local network, not just a model of one.</span></div>
+          <div class="need-point"><strong>Reproducible</strong><span>Preserve configuration, seeds, metrics and reports.</span></div>
+          <div class="need-point"><strong>Adversary-aware</strong><span>Make observer capability an explicit experimental variable.</span></div>
+          <div class="need-point"><strong>Falsifiable</strong><span>Compare, sweep and repeat rather than relying on one attractive run.</span></div>
+        </div>
+      </div>
+
+      <div class="answer-strip reveal">
+        <span>That is why AnonTestLab exists.</span>
+        <p>
+          AnonTestLab provides a common execution layer for asking controlled questions about anonymous communication designs
+          <strong>before the cost of a production implementation is justified.</strong> Tor and analytical simulation remain useful for different purposes.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="statement">
+    <div class="wrap reveal">
+      <blockquote>
+        Change the <span class="accent">assumption</span>.<br/>
+        Re-run the network.<br/>
+        Measure what changed.
+      </blockquote>
+      <small>Configuration-driven experiments with preserved seeds, metrics and reports.</small>
+    </div>
+  </section>
+
+  <section id="capabilities">
+    <div class="wrap">
+      <div class="section-top reveal">
+        <div class="kicker">02 / Experimental surface</div>
         <div>
-          <h3><code>spawn_relays()</code> forks N real subprocesses</h3>
-          <p>Each relay is its own OS process bound to its own loopback address, <code>127.0.0.1</code> through <code>127.0.0.254</code>, so each relay behaves as a separate host.</p>
+          <h2>A protocol workbench for controlled variation.</h2>
+          <p class="subcopy">
+            Routing, traffic, mixing, shaping, cryptography, link conditions and adversary visibility are independent dimensions
+            of the experiment.
+          </p>
         </div>
       </div>
-      <div class="step">
-        <div class="idx">3</div>
+
+      <div class="cap-grid">
+        <article class="card reveal">
+          <div class="icon">↗</div>
+          <h3>Routing & multipath</h3>
+          <p>Compare single-path and multipath behavior with multiple path-selection and traffic-splitting policies.</p>
+          <ul>
+            <li>Random and bandwidth-weighted relay selection</li>
+            <li>Round-robin, random, IID, batch and nominal-RTT latency split policies</li>
+            <li>Disjoint legs or a shared common exit</li>
+          </ul>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon">≋</div>
+          <h3>Traffic & relay mixing</h3>
+          <p>Vary traffic distributions and apply relay-side delay defenses without creating a separate testbed.</p>
+          <ul>
+            <li>Poisson, constant, Pareto and burst traffic</li>
+            <li>Cover traffic and configurable cover dropping</li>
+            <li>Constant, exponential and pool mixing</li>
+          </ul>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon">◇</div>
+          <h3>Real per-hop crypto</h3>
+          <p>Circuits perform telescoping handshakes and use selectable AEAD algorithms instead of adding an artificial crypto delay.</p>
+          <ul>
+            <li>X25519, X448 and P-256 ECDHE</li>
+            <li>AES-GCM variants, OCB3* and ChaCha20-Poly1305</li>
+            <li>Plaintext mode to isolate transport cost</li>
+          </ul>
+          <p class="micro-note">* AES-OCB3 requires OCB support in the host OpenSSL build.</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon">⌁</div>
+          <h3>WAN-like conditions</h3>
+          <p>Make localhost links behave less like localhost while retaining a controlled, repeatable laboratory.</p>
+          <ul>
+            <li>Latency and jitter</li>
+            <li>Packet loss and bandwidth limits</li>
+            <li>Per-node and per-edge heterogeneity (forward direction)</li>
+          </ul>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon">◎</div>
+          <h3>Pluggable adversaries</h3>
+          <p>Make attacker capability an explicit experimental parameter rather than an implicit assumption.</p>
+          <ul>
+            <li>Global / partial traffic observation</li>
+            <li>Correlation suite and path compromise</li>
+            <li>Active watermarking and structural hop-depth leakage</li>
+          </ul>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon">Σ</div>
+          <h3>Research workflows</h3>
+          <p>Move beyond a single run with tooling designed for comparison, repeated seeds and experimental validity.</p>
+          <ul>
+            <li>Compare and one-parameter sweeps</li>
+            <li>Paired multi-seed analysis with bootstrap confidence intervals</li>
+            <li>Analytical prediction and host-noise fidelity checks</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="workflow">
+    <div class="wrap">
+      <div class="section-top reveal">
+        <div class="kicker">03 / Workflow</div>
         <div>
-          <h3><code>build_circuit()</code> telescopes hop by hop</h3>
-          <p>A real ephemeral ECDHE handshake and HKDF key derivation per hop, hop-local circuit IDs, independent forward and backward keys for the return path.</p>
+          <h2>Describe the experiment. Execute the network. Inspect the evidence.</h2>
         </div>
       </div>
-      <div class="step">
-        <div class="idx">4</div>
+
+      <div class="workflow reveal">
+        <div class="flow">
+          <div class="step"><code>01</code><b>Configure</b><span>Define network, routes, traffic, crypto and observers in YAML.</span></div>
+          <div class="step"><code>02</code><b>Spawn</b><span>Launch relay subprocesses on local loopback addresses.</span></div>
+          <div class="step"><code>03</code><b>Build</b><span>Construct telescoping circuits with per-hop ECDHE and keys.</span></div>
+          <div class="step"><code>04</code><b>Run</b><span>Send onion-wrapped traffic across real sockets and configured links.</span></div>
+          <div class="step"><code>05</code><b>Measure</b><span>Export metrics, configuration, seed and experiment report.</span></div>
+        </div>
+      </div>
+
+      <div class="split" style="margin-top:32px">
+        <div class="codepanel reveal">
+          <div class="codehead"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp;&nbsp; experiment.yaml</div>
+          <pre><span class="y">experiment:</span>
+  <span class="b">name:</span> multipath-study
+  <span class="b">seed:</span> <span class="o">20260903</span>
+  <span class="b">duration_s:</span> <span class="o">8</span>
+
+<span class="y">routing:</span>
+  <span class="b">paths:</span>
+    - <span class="b">strategy:</span> bandwidth_weighted
+      <span class="b">path_length:</span> <span class="o">3</span>
+    - <span class="b">strategy:</span> random
+      <span class="b">path_length:</span> <span class="o">4</span>
+  <span class="b">split_strategy:</span> iid
+  <span class="b">split_weights:</span> [<span class="o">0.7</span>, <span class="o">0.3</span>]
+  <span class="b">merge:</span> common_exit
+
+<span class="y">traffic:</span>
+  <span class="b">distribution:</span> pareto
+  <span class="b">real_rate:</span> <span class="o">6</span>
+  <span class="b">cover_rate:</span> <span class="o">2</span>
+
+<span class="y">mixing:</span>
+  <span class="b">strategy:</span> pool
+  <span class="b">pool_interval_ms:</span> <span class="o">250</span>
+
+<span class="y">crypto:</span>
+  <span class="b">algorithm:</span> chacha20poly1305
+  <span class="b">keyexchange:</span> x25519</pre>
+        </div>
+
+        <div class="reveal">
+          <div class="kicker">One engine, several interfaces</div>
+          <h3 style="font-size:36px;letter-spacing:-.04em;margin:12px 0 24px">CLI for repeatability. Dashboard for exploration.</h3>
+          <div class="feature-list">
+            <div class="feature-row"><strong><code>atl run</code></strong><span>Execute one experiment and collect its metrics.</span></div>
+            <div class="feature-row"><strong><code>atl compare</code></strong><span>Run two configurations and diff every metric.</span></div>
+            <div class="feature-row"><strong><code>atl sweep</code></strong><span>Vary one field over a set of values and export the series.</span></div>
+            <div class="feature-row"><strong><code>atl paired</code></strong><span>Run matched seeds and classify the paired effect against an equivalence margin.</span></div>
+            <div class="feature-row"><strong><code>atl predict</code></strong><span>Inspect the model's closed-form expectations without executing a run.</span></div>
+            <div class="feature-row"><strong><code>atl fidelity</code></strong><span>Check whether host scheduling noise is contaminating a timing experiment.</span></div>
+            <div class="feature-row"><strong><code>atl dashboard</code></strong><span>Use a local browser UI backed by the same experiment runner.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="research" id="research">
+    <div class="wrap">
+      <div class="section-top reveal">
+        <div class="kicker">04 / Research questions</div>
         <div>
-          <h3>Real onion-wrapped cells over real sockets</h3>
-          <p>Optionally padded to a fixed <code>cell_size</code>, optionally fragmented across cells, optionally slowed by per-node or per-edge WAN conditions.</p>
+          <h2>Built to turn anonymity claims into experiments.</h2>
+          <p class="subcopy">The framework does not prescribe one answer. It makes the assumptions behind the question configurable.</p>
         </div>
       </div>
-      <div class="step">
-        <div class="idx">5</div>
+
+      <div class="questions">
+        <article class="question reveal"><small>Multipath</small><p>Does path splitting still help when the observer can see more than one leg?</p></article>
+        <article class="question reveal"><small>Correlation</small><p>Does a delay defense survive when the attacker becomes lag-aware?</p></article>
+        <article class="question reveal"><small>Cover traffic</small><p>How much correlation reduction is gained for the additional bandwidth cost?</p></article>
+        <article class="question reveal"><small>Mixing</small><p>When does pool or exponential mixing produce a meaningful effect rather than host noise?</p></article>
+        <article class="question reveal"><small>Visibility</small><p>How much of the network must an adversary observe before linkage becomes reliable?</p></article>
+        <article class="question reveal"><small>Validity</small><p>Is the result caused by the protocol configuration, or by the machine running the experiment?</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="limitations">
+    <div class="wrap limits">
+      <div class="reveal">
+        <div class="kicker">05 / Scope</div>
+        <h2 style="margin-top:14px">Useful because the simplifications are visible.</h2>
+        <p class="subcopy">
+          AnonTestLab is a research instrument with a deliberately bounded model. Its limitations belong in the methodology.
+        </p>
+      </div>
+
+      <div class="limits-list reveal">
+        <div class="limit"><strong>Not a Tor protocol implementation.</strong><span>The project uses its own simple wire protocol and does not implement Tor's directory or consensus system.</span></div>
+        <div class="limit"><strong>Fixed-size shaping is optional.</strong><span>Cells are not fixed-size by default; traffic shaping can opt into fixed-size padding.</span></div>
+        <div class="limit"><strong>Fixed-size cells still expose hop position.</strong><span>The current v0.4 construction can leak structural hop-depth information, which the framework can measure explicitly.</span></div>
+        <div class="limit"><strong>Relay identities are ephemeral.</strong><span>There is no persistent relay identity or reputation system.</span></div>
+        <div class="limit"><strong>Bandwidth-weighted routing is simplified.</strong><span>It does not reproduce Tor guard/exit flag constraints or positional selection rules.</span></div>
+        <div class="limit"><strong>Latency scheduling uses nominal RTTs.</strong><span>The latency split policy schedules using configured round-trip times. The legs are not given different real latencies by that policy.</span></div>
+        <div class="limit"><strong>Per-edge link conditions are forward-direction only.</strong><span>Per-edge latency, jitter, loss and bandwidth settings affect the forward direction of the configured edge.</span></div>
+        <div class="limit"><strong>OCB3 depends on the host OpenSSL build.</strong><span>AES-OCB3 is available only when the host OpenSSL build includes OCB support.</span></div>
+        <div class="limit"><strong>Wave-mode clocks start per session.</strong><span>With <code>sessions.max_concurrent</code>, each session starts its experiment clock when that session begins. Timing comparisons should account for this.</span></div>
+        <div class="limit"><strong>Measured timing varies.</strong><span>Seeds reproduce controlled choices, while real process and socket timing remains naturally variable between runs.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:15px">
+    <div class="wrap">
+      <div class="cta reveal">
         <div>
-          <h3>MetricsCollector meets a pluggable Adversary</h3>
-          <p>Measured latency, delivery, and bandwidth feed one or more adversary models; results land in <code>results/&lt;name&gt;/</code> with a baseline diff if one's set.</p>
+          <div class="kicker" style="color:#cbd8cf">Open source · GPL-3.0-or-later</div>
+          <h2 style="margin:12px 0 18px">Build the experiment.<br/>Run the network.<br/>Test the assumption.</h2>
+          <p>
+            Clone AnonTestLab, start with the Tor-like preset, then change the routing, traffic, defenses or adversary and measure the effect.
+          </p>
         </div>
+        <a class="btn" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">Explore the repository ↗</a>
       </div>
     </div>
-  </div>
-</section>
-
-<section id="contributions">
-  <div class="wrap">
-    <div class="eyebrow">03 &middot; what this adds to the domain</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:34ch;">Eleven things you can't test on a discrete-event simulator</h2>
-    <div class="contrib-grid">
-      <div class="contrib">
-        <div class="tag">RUNTIME &middot; <code>anontestlab.emulator</code></div>
-        <h3>Emulation without a timing model</h3>
-        <p>Subprocesses, sockets and crypto run for real. Latency and delivery are measured, with no assumed distribution behind them.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">CRYPTO &middot; <code>crypto_layer.py</code></div>
-        <h3>Bidirectional onion encryption</h3>
-        <p>The return path is re-encrypted per hop with its own key, independent from the forward key but derived from the same handshake via HKDF, matching Tor's own directional key separation.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">ADVERSARY &middot; <code>hop_depth.py</code></div>
-        <h3>A leak, measured instead of assumed</h3>
-        <p>Fixed-size cells still shrink by a fixed amount per hop position. The <code>hop_depth</code> adversary is a structural attacker that quantifies exactly how recoverable that position is, turning a disclosed simplification into a tested number.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">CRYPTO &middot; <code>anontestlab.crypto</code></div>
-        <h3>Crypto-agility as a first-class axis</h3>
-        <p>Six AEAD ciphers across three ECDHE curves, selectable per experiment, for studies that compare the choice of algorithm.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">NETWORK &middot; <code>relay_process.py</code></div>
-        <h3>WAN realism at two granularities</h3>
-        <p>Per-node heterogeneous conditions layer with directional per-edge conditions, so a relay's link to one peer can differ from its link to another as well as from other relays.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">ADVERSARY &middot; <code>anontestlab.adversary</code></div>
-        <h3>A composable observer pipeline</h3>
-        <p>Observation, Feature, and Decision are separately swappable stages, so a new correlation statistic or classifier drops in without touching how traffic is observed.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">METHOD &middot; README.md</div>
-        <h3>Simplifications are stated</h3>
-        <p>Every scope trim is stated in the open and, where practical, has its own regression test, so each known limitation has been checked.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">ROUTING &middot; <code>splitting.py</code> &middot; v0.4</div>
-        <h3>Multipath split policies</h3>
-        <p>One flow split over several circuits that share an exit, as in Conflux: i.i.d., weighted round-robin, batch and lowest-RTT scheduling, with the adversary observing chosen entry legs and the merged exit side.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">NETWORK &middot; <code>mixing.py</code> &middot; v0.4</div>
-        <h3>Relay mixing and bursty traffic</h3>
-        <p>Constant, exponential (Loopix-style) or pool mixing at every hop, and a bursty traffic generator whose dispersion can be matched to measured Tor traffic, so mix-network and onion-routing settings share one emulator.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">ADVERSARY &middot; <code>correlation_suite.py</code> &middot; v0.4</div>
-        <h3>Training-free correlation attackers with predictions</h3>
-        <p>Zero-lag, lag-aware, likelihood-ratio and timing-window attackers scored side by side on one held-out split, with confident linkage at a stated base rate and closed-form model predictions recorded next to every measurement (<code>atl predict</code>).</p>
-      </div>
-      <div class="contrib">
-        <div class="tag">METHOD &middot; <code>fidelity.py</code> &middot; v0.4</div>
-        <h3>A check on host-induced timing noise</h3>
-        <p><code>atl fidelity</code> reruns an experiment's load with mixing off and reports the delay the host adds, so a run on a busy machine is flagged before its timing results are trusted; wave mode keeps large runs under that limit.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="spec">
-  <div class="wrap">
-    <div class="eyebrow">04 &middot; configuration surface</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:28ch;">Every axis is one YAML field away</h2>
-    <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
-      6 AEAD ciphers &times; 3 ECDHE curves &times; 2 routing strategies &times; 3
-      traffic distributions &times; 4 adversary models: 432 combinations, each one
-      set by config fields without code changes.
-    </p>
-
-    <h3 style="font-family:'IBM Plex Mono', monospace; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-top:48px;">Traffic &amp; topology</h3>
-    <div class="contrib-grid" style="margin-top:20px;">
-      <div class="contrib">
-        <div class="tag"><code>traffic.*</code></div>
-        <h3>Traffic distribution</h3>
-        <p><code>real_rate</code> and <code>cover_rate</code>, each drawn from <code>poisson</code> (default), <code>constant</code>, or <code>pareto</code> for bursty, heavy-tailed arrivals. Real traffic is measured; cover traffic is decoy volume.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag"><code>cover_behaviour.*</code></div>
-        <h3>Cover traffic dropping</h3>
-        <p><code>drop_probability</code> lets an intermediate mix node silently discard a fraction of cover cells, modeling a relay that doesn't forward every decoy. Real cells are never dropped this way.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag"><code>routing.*</code></div>
-        <h3>Routing &amp; path splitting</h3>
-        <p><code>routing_strategy</code>: <code>random</code> or <code>bandwidth_weighted</code>. <code>path_length</code> sets hops per path; <code>num_paths</code> and <code>split_strategy</code> (<code>round_robin</code> or <code>random</code>) spread one session across more than one path.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag"><code>traffic_shaping.*</code></div>
-        <h3>Cell shaping</h3>
-        <p><code>cell_size</code> pads every cell to one fixed wire size; <code>mode</code> is <code>variable</code> or <code>fixed_rate</code>, a scheduled send cadence. Oversized payloads fragment across multiple cells automatically.</p>
-      </div>
-      <div class="contrib">
-        <div class="tag"><code>link_conditions.*</code></div>
-        <h3>WAN realism</h3>
-        <p><code>latency_ms</code>, <code>jitter_ms</code>, <code>loss_probability</code>, <code>bandwidth_kbps</code>, plus <code>heterogeneous</code> (per-node variation) and <code>per_edge</code> (per relay-to-peer variation, directional).</p>
-      </div>
-    </div>
-
-    <h3 style="font-family:'IBM Plex Mono', monospace; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); margin-top:48px;">Crypto &amp; adversaries</h3>
-    <div class="spec-cols">
-      <div class="tablewrap">
-        <table>
-          <caption>crypto.algorithm</caption>
-          <thead><tr><th>Cipher</th><th>Note</th></tr></thead>
-          <tbody>
-            <tr><td class="cellname">none</td><td>plaintext passthrough, isolates transport cost</td></tr>
-            <tr><td class="cellname">aes128gcm</td><td>128-bit key</td></tr>
-            <tr><td class="cellname">aes256gcm</td><td>256-bit key, default</td></tr>
-            <tr><td class="cellname">aes256gcmsiv</td><td>nonce-misuse resistant</td></tr>
-            <tr><td class="cellname">aes256ocb3</td><td>faster construction</td></tr>
-            <tr><td class="cellname">chacha20poly1305</td><td>stream-cipher based</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="tablewrap">
-        <table>
-          <caption>crypto.keyexchange</caption>
-          <thead><tr><th>Curve</th><th>Note</th></tr></thead>
-          <tbody>
-            <tr><td class="cellname">x25519</td><td>default, Curve25519</td></tr>
-            <tr><td class="cellname">x448</td><td>RFC 7748, larger keys</td></tr>
-            <tr><td class="cellname">p256</td><td>NIST secp256r1</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="tablewrap" style="margin-top:40px;">
-      <table>
-        <caption>adversary.types</caption>
-        <thead><tr><th>Adversary</th><th>Model</th><th>Key metric</th></tr></thead>
-        <tbody>
-          <tr><td class="cellname">global_observer</td><td>Observation &rarr; Feature &rarr; Decision, AS-level partial visibility</td><td>auc, tpr_at_fpr</td></tr>
-          <tr><td class="cellname">path_compromise</td><td>independent-compromise Monte Carlo, no packets move</td><td>full_compromise_rate</td></tr>
-          <tr><td class="cellname">watermark</td><td>active delay-pattern injection at hop 1</td><td>watermark_detection_rate</td></tr>
-          <tr><td class="cellname">hop_depth</td><td>structural, quantifies the fixed-size-cell leak</td><td>hop_position_accuracy</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section id="limitations">
-  <div class="wrap">
-    <div class="eyebrow">05 &middot; methodology</div>
-    <h2 style="font-size:2rem; font-weight:800; max-width:30ch;">Disclosed simplifications</h2>
-    <p style="color:var(--muted); max-width:64ch; margin-top:14px;">
-      These scope trims still stand, each one deliberate:
-    </p>
-    <div class="disclosure">
-      <h3>Known limitations, v0.4</h3>
-      <ul>
-        <li><b>Fixed-size cells still leak hop position.</b> A global observer watching multiple hops of one circuit could infer depth from the size sequence, which is exactly what <code>hop_depth</code> measures.</li>
-        <li><b>Per-edge link conditions are directional-only.</b> Only the connection-initiating side scales by the edge factor; the receiving side's own upstream sends still use its plain per-node value.</li>
-        <li><b>No relay identity or directory system.</b> Keys are ephemeral only: no TOFU question to answer, but also no persistent relay reputation.</li>
-        <li><b><code>bandwidth_weighted</code> routing skips guard/exit-flag constraints.</b> It weights by node capacity alone, deliberately not replicating Tor's position rules.</li>
-        <li><b>Wave mode changes the timestamp origin.</b> With <code>sessions.max_concurrent</code>, each session's timestamps start at its own start, so flows from different waves line up as if concurrent.</li>
-        <li><b>The <code>latency</code> split policy uses nominal RTTs.</b> The scheduler follows the configured leg RTTs; the legs are not given different real latencies.</li>
-        <li><b>Timing varies run to run.</b> The experiment design is reproducible from its seed; measured latency varies because it comes from real runs.</li>
-      </ul>
-    </div>
-  </div>
-</section>
+  </section>
+</main>
 
 <footer>
-  <div class="wrap">
-    <div class="footer-grid">
-      <div>
-        <h4>Quickstart</h4>
-        <div class="install">
-<span class="prompt">$</span> pip install -e ".[dev]"
-<span class="prompt">$</span> atl run examples/tor_like.yaml
-<span class="prompt">$</span> atl wizard</div>
-      </div>
-      <div>
-        <h4>Project</h4>
-        <ul>
-          <li><a href="https://github.com/hashtagRR/AnonTestLab">Source on GitHub</a></li>
-          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/README.md">Full documentation</a></li>
-          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/INSTALL.md">Install guide</a></li>
-        </ul>
-      </div>
-      <div>
-        <h4>License</h4>
-        <ul>
-          <li><a href="https://github.com/hashtagRR/AnonTestLab/blob/main/LICENSE">GPL-3.0-or-later</a></li>
-          <li><a href="https://github.com/hashtagRR/AnonTestLab/tree/main/examples">Example configs</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="foot-bottom">
-      <span>AnonTestLab &middot; maintained by hashtagRR</span>
-      <span>spec revision v0.4</span>
-    </div>
+  <div class="wrap footerline">
+    <span>AnonTestLab · Anonymous communication network experimentation</span>
+    <span>Research harness · v0.4 scope · GPL-3.0-or-later</span>
   </div>
 </footer>
 
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+</script>
 </body>
 </html>
