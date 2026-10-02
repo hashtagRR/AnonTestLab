@@ -414,7 +414,11 @@ async def run_experiment_async(
     node_ids = [h.node_id for h in handles]
     addr_of = {h.node_id: (h.host, h.port) for h in handles}
     node_weights = {h.node_id: h.bandwidth_weight for h in handles}
-    emit("relays_ready", num_nodes=len(handles))
+    # pids let a caller signal these specific OS processes directly (a stop
+    # request, or future live-topology instrumentation) without reaching
+    # back into this coroutine, which may be running on another thread's
+    # event loop by the time the caller wants to act on them.
+    emit("relays_ready", num_nodes=len(handles), pids=[h.process.pid for h in handles])
 
     try:
         collector = MetricsCollector()
@@ -498,6 +502,7 @@ async def run_experiment_async(
                     completed=sessions_completed,
                     total=config.num_sessions,
                     error=str(e),
+                    paths=node_paths,
                 )
                 return
             for p in packets:
@@ -512,6 +517,7 @@ async def run_experiment_async(
                 session_id=session_id,
                 completed=sessions_completed,
                 total=config.num_sessions,
+                paths=node_paths,
                 real_sent=real_sent,
                 real_delivered=real_delivered,
                 build_delay_s=build_delay,

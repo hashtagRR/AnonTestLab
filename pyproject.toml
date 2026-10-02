@@ -28,6 +28,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["anontestlab*"]
 
+[tool.setuptools.package-data]
+"anontestlab.dashboard" = ["static/*"]
+
 [tool.ruff]
 target-version = "py39"  # matches requires-python: keeps pyupgrade suggestions
 # from assuming syntax (e.g. the 3.10+ `X | Y` union operator at runtime)

@@ -2,413 +2,45 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AnonTestLab Dashboard</title>
-<style>
-  :root {
-    color-scheme: light dark;
-    --bg: #faf7fd;
-    --surface: #f2ecfa;
-    --surface-alt: #eaf6f3;
-    --border: #d9c9ef;
-    --accent: #a892d8;
-    --accent-strong: #8a6fc4;
-    --mint: #9bd9c8;
-    --peach: #f5c9a8;
-    --pink: #eab8c4;
-    --text: #3c3752;
-    --text-soft: #746e8c;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #211f2e;
-      --surface: #2b2740;
-      --surface-alt: #24303a;
-      --border: #473f66;
-      --accent: #c3b0ec;
-      --accent-strong: #d6c6f7;
-      --mint: #8fd6c2;
-      --peach: #e3b78f;
-      --pink: #e3a9ba;
-      --text: #e9e5f7;
-      --text-soft: #b3accf;
-    }
-  }
-  body {
-    font-family: -apple-system, system-ui, sans-serif;
-    max-width: 960px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-    background: var(--bg);
-    color: var(--text);
-  }
-  h1 { font-size: 1.4rem; color: var(--accent-strong); }
-  h2 {
-    font-size: 1.1rem;
-    margin-top: 2rem;
-    border-bottom: 2px solid var(--border);
-    padding-bottom: .3rem;
-    color: var(--accent-strong);
-  }
-  fieldset {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 1rem;
-    background: var(--surface);
-  }
-  legend { font-weight: 600; padding: 0 .5rem; color: var(--accent-strong); }
-  label { display: inline-block; min-width: 220px; margin: .3rem 0; }
-  input[type=number], input[type=text], select {
-    width: 140px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    padding: .25rem .4rem;
-  }
-  input[type=checkbox] { accent-color: var(--accent); }
-  .row { display: flex; align-items: center; margin: .3rem 0; flex-wrap: wrap; }
-  .hidden { display: none !important; }
-  textarea {
-    width: 100%;
-    min-height: 260px;
-    font-family: ui-monospace, monospace;
-    font-size: .85rem;
-    box-sizing: border-box;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text);
-    padding: .6rem;
-  }
-  button {
-    padding: .5rem 1.1rem;
-    font-size: 1rem;
-    cursor: pointer;
-    margin-right: .5rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--mint);
-    color: var(--text);
-    transition: filter .15s ease;
-  }
-  button:hover { filter: brightness(0.95); }
-  button:disabled { filter: grayscale(0.5); cursor: default; }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: .5rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  td, th { border: 1px solid var(--border); padding: .4rem .6rem; text-align: left; font-size: .9rem; }
-  th { background: var(--surface-alt); color: var(--accent-strong); }
-  caption { text-align: left; font-weight: 600; padding: .3rem 0; color: var(--accent-strong); }
-  #status { margin: .5rem 0; font-style: italic; color: var(--text-soft); }
-  #error { color: #c0392b; white-space: pre-wrap; }
-  #progress {
-    font-family: ui-monospace, monospace;
-    font-size: .85rem;
-    margin: .3rem 0;
-    background: var(--surface-alt);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: .1rem .8rem;
-  }
-  #progress div { padding: .25rem 0; }
-</style>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<h1>AnonTestLab Dashboard</h1>
-<p>A form over the same YAML experiment format the CLI uses. Fill in the
-basics, generate the YAML, tweak it directly if you need an advanced
-option (traffic shaping, link conditions, AS groups, watermarking) that
-isn't a field below, then run.</p>
-
-<h2>1. Mode</h2>
-<div class="row">
-  <label><input type="radio" name="mode" value="tor_like" checked onchange="onModeChange()"> tor_like (fixed preset)</label>
-  <label><input type="radio" name="mode" value="custom" onchange="onModeChange()"> custom</label>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AT</div>
+      <div><h1>AnonTestLab</h1><p>Anonymous-network research workbench</p></div>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <div class="nav-label">Workbench</div>
+      <a href="#/experiments" data-nav="experiments"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7l6-5 6 5v7H2z"/><path d="M6 14v-4h4v4"/></svg><span>Experiments</span></a>
+      <a href="#/new" data-nav="new"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 5v6M5 8h6"/></svg><span>New experiment</span></a>
+      <a href="#/runs" data-nav="runs"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3l9 5-9 5z"/></svg><span>Runs</span></a>
+      <a href="#/results" data-nav="results"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M4 11V7M8 11V3M12 11V8"/></svg><span>Results</span></a>
+      <div class="nav-label">Research tools</div>
+      <a href="#/compare" data-nav="compare"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h10l-3-3M14 11H4l3 3"/></svg><span>Compare</span></a>
+      <a href="#/sweep" data-nav="sweep"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-5 3 3 5-7"/></svg><span>Sweep</span></a>
+      <a href="#/paired" data-nav="paired"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="4" cy="11" r="1.6"/><circle cx="12" cy="13" r="1.6"/><path d="M5.5 4.4l5 1.2M5.5 11.4l5 1.2"/></svg><span>Paired</span></a>
+      <a href="#/predict" data-nav="predict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13c3 0 4-10 7-10s2 6 5 6"/></svg><span>Predict</span></a>
+      <a href="#/fidelity" data-nav="fidelity"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.5l3 3 7-7"/></svg><span>Fidelity</span></a>
+      <div class="nav-label">Project</div>
+      <a href="#/artifacts" data-nav="artifacts"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3"/></svg><span>Artifacts</span></a>
+    </nav>
+    <div class="side-foot" id="side-foot">Local dashboard. Values are measured by this machine's emulator runs.</div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs" id="crumbs">AnonTestLab</div>
+      <div class="actions">
+        <button class="btn small" id="theme-btn" type="button" aria-label="Toggle color theme">Theme</button>
+      </div>
+    </header>
+    <main class="content" id="view" tabindex="-1"></main>
+  </div>
 </div>
-
-<h2>2. Basics</h2>
-<div class="row"><label for="name">Experiment name</label><input type="text" id="name" value="dashboard-run"></div>
-<div class="row"><label for="seed">Seed</label><input type="number" id="seed" value="20260903"></div>
-<div class="row"><label for="duration_s">Duration (s)</label><input type="number" id="duration_s" value="8" step="0.5"></div>
-<div class="row"><label for="num_sessions">Sessions</label><input type="number" id="num_sessions" value="8"></div>
-<div class="row"><label for="num_nodes">Relay nodes</label><input type="number" id="num_nodes" value="10"></div>
-<div class="row"><label for="real_rate">Real traffic rate (pkt/s)</label><input type="number" id="real_rate" value="5" step="0.5"></div>
-
-<fieldset id="custom-fields">
-<legend>3. Custom-only</legend>
-
-<div class="row"><label for="path_length">Path length (hops)</label><input type="number" id="path_length" value="3"></div>
-<div class="row"><label for="num_paths">Number of paths</label><input type="number" id="num_paths" value="1" onchange="onPathsChange()"></div>
-<div class="row" id="split-row"><label for="split_strategy">Split strategy</label>
-  <select id="split_strategy"><option value="round_robin">round_robin</option><option value="random">random</option></select>
-</div>
-
-<div class="row"><label><input type="checkbox" id="cover_enabled" onchange="onCoverChange()"> Enable cover traffic</label></div>
-<div class="row hidden" id="cover-fields">
-  <label for="cover_rate">Cover rate (pkt/s)</label><input type="number" id="cover_rate" value="5" step="0.5">
-  <label for="cover_drop">Drop probability/hop</label><input type="number" id="cover_drop" value="0" step="0.05" min="0" max="1">
-</div>
-
-<div class="row"><label for="crypto_algorithm">Crypto algorithm</label>
-  <select id="crypto_algorithm">
-    <option value="none">none</option>
-    <option value="aes128gcm">aes128gcm</option>
-    <option value="aes256gcm" selected>aes256gcm</option>
-    <option value="aes256gcmsiv">aes256gcmsiv</option>
-    <option value="aes256ocb3">aes256ocb3</option>
-    <option value="chacha20poly1305">chacha20poly1305</option>
-  </select>
-</div>
-<div class="row"><label for="crypto_keyexchange">Key exchange curve</label>
-  <select id="crypto_keyexchange">
-    <option value="x25519" selected>x25519</option>
-    <option value="x448">x448</option>
-    <option value="p256">p256</option>
-  </select>
-</div>
-
-<div class="row"><label>Adversaries</label>
-  <label style="min-width:auto; margin-right:1rem"><input type="checkbox" id="adv_global" checked> global_observer</label>
-  <label style="min-width:auto; margin-right:1rem"><input type="checkbox" id="adv_compromise" onchange="onCompromiseChange()"> path_compromise</label>
-  <label style="min-width:auto"><input type="checkbox" id="adv_watermark"> watermark</label>
-</div>
-<div class="row hidden" id="compromise-fields">
-  <label for="compromised_fraction">Compromised fraction</label><input type="number" id="compromised_fraction" value="0.1" step="0.05" min="0" max="1">
-  <label for="compromise_trials">Monte Carlo trials</label><input type="number" id="compromise_trials" value="2000">
-</div>
-</fieldset>
-
-<div class="row">
-  <button onclick="generateYaml()">Generate YAML</button>
-</div>
-
-<h2>4. Experiment YAML (edit freely, including advanced options)</h2>
-<textarea id="yaml"></textarea>
-
-<div class="row">
-  <button id="run-btn" onclick="runExperiment()">Run Experiment</button>
-</div>
-<div id="status"></div>
-<div id="progress"></div>
-<div id="error"></div>
-
-<h2>Results</h2>
-<div id="results"></div>
-
-<script>
-function onModeChange() {
-  const custom = document.querySelector('input[name=mode]:checked').value === 'custom';
-  document.getElementById('custom-fields').classList.toggle('hidden', !custom);
-}
-function onCoverChange() {
-  document.getElementById('cover-fields').classList.toggle('hidden', !document.getElementById('cover_enabled').checked);
-}
-function onCompromiseChange() {
-  document.getElementById('compromise-fields').classList.toggle('hidden', !document.getElementById('adv_compromise').checked);
-}
-function onPathsChange() {
-  document.getElementById('split-row').classList.toggle('hidden', Number(document.getElementById('num_paths').value) <= 1);
-}
-onModeChange(); onCoverChange(); onCompromiseChange(); onPathsChange();
-
-function val(id) { return document.getElementById(id).value; }
-function checked(id) { return document.getElementById(id).checked; }
-
-function generateYaml() {
-  const mode = document.querySelector('input[name=mode]:checked').value;
-  const lines = [];
-  lines.push('experiment:');
-  lines.push(`  name: ${val('name')}`);
-  lines.push(`  mode: ${mode}`);
-  lines.push(`  seed: ${val('seed')}`);
-  lines.push(`  duration_s: ${val('duration_s')}`);
-  lines.push('');
-  lines.push('network:');
-  lines.push(`  nodes: ${val('num_nodes')}`);
-  lines.push('');
-  lines.push('sessions:');
-  lines.push(`  count: ${val('num_sessions')}`);
-  lines.push('');
-
-  if (mode === 'tor_like') {
-    lines.push('routing:');
-    lines.push('  strategy: random');
-    lines.push('  path_length: 3');
-    lines.push('');
-    lines.push('traffic:');
-    lines.push(`  real_rate: ${val('real_rate')}`);
-    lines.push('  cover_rate: 0');
-    lines.push('');
-    lines.push('adversary:');
-    lines.push('  type: global_observer');
-  } else {
-    const numPaths = Number(val('num_paths')) || 1;
-    lines.push('routing:');
-    if (numPaths > 1) {
-      lines.push('  paths:');
-      for (let i = 0; i < numPaths; i++) {
-        lines.push('    - strategy: random');
-        lines.push(`      path_length: ${val('path_length')}`);
-      }
-      lines.push(`  split_strategy: ${val('split_strategy')}`);
-    } else {
-      lines.push('  strategy: random');
-      lines.push(`  path_length: ${val('path_length')}`);
-    }
-    lines.push('');
-    lines.push('traffic:');
-    lines.push(`  real_rate: ${val('real_rate')}`);
-    if (checked('cover_enabled')) {
-      lines.push(`  cover_rate: ${val('cover_rate')}`);
-      lines.push('');
-      lines.push('cover_behaviour:');
-      lines.push(`  drop_probability: ${val('cover_drop')}`);
-    } else {
-      lines.push('  cover_rate: 0');
-    }
-    lines.push('');
-    lines.push('crypto:');
-    lines.push(`  algorithm: ${val('crypto_algorithm')}`);
-    lines.push(`  keyexchange: ${val('crypto_keyexchange')}`);
-    lines.push('');
-
-    const advTypes = [];
-    if (checked('adv_global')) advTypes.push('global_observer');
-    if (checked('adv_compromise')) advTypes.push('path_compromise');
-    if (checked('adv_watermark')) advTypes.push('watermark');
-    lines.push('adversary:');
-    lines.push(`  types: [${advTypes.join(', ')}]`);
-    if (checked('adv_compromise')) {
-      lines.push(`  compromised_fraction: ${val('compromised_fraction')}`);
-      lines.push(`  compromise_trials: ${val('compromise_trials')}`);
-    }
-  }
-  document.getElementById('yaml').value = lines.join('\n') + '\n';
-}
-generateYaml();
-
-function formatEvent(e) {
-  if (e.type === 'relays_ready') return `${e.num_nodes} relays ready`;
-  if (e.type === 'session_complete') {
-    const buildMs = (e.build_delay_s * 1000).toFixed(0);
-    return `session ${e.completed}/${e.total} complete (${e.real_delivered}/${e.real_sent} real delivered, build ${buildMs}ms)`;
-  }
-  if (e.type === 'session_failed') return `session ${e.completed}/${e.total} FAILED: ${e.error}`;
-  if (e.type === 'experiment_complete') {
-    return e.sessions_failed ? `${e.sessions_failed}/${e.total} session(s) failed` : 'experiment complete';
-  }
-  return e.type;
-}
-
-function pollUntilDone(progressEl) {
-  const statusEl = document.getElementById('status');
-  const errorEl = document.getElementById('error');
-  const resultsEl = document.getElementById('results');
-  let seen = 0;
-  return new Promise((resolve, reject) => {
-    async function tick() {
-      try {
-        const resp = await fetch('/api/status');
-        const data = await resp.json();
-        for (; seen < data.events.length; seen++) {
-          const line = document.createElement('div');
-          line.textContent = formatEvent(data.events[seen]);
-          progressEl.appendChild(line);
-        }
-        if (data.active) {
-          setTimeout(tick, 700);
-          return;
-        }
-        if (data.error) {
-          statusEl.textContent = '';
-          errorEl.textContent = 'Error: ' + data.error;
-        } else if (data.result) {
-          statusEl.textContent = `Done, written to ${data.result.out_dir}/`;
-          resultsEl.appendChild(metricsTable(data.result.name, data.result.metrics));
-          if (data.result.baseline) {
-            resultsEl.appendChild(compareTable(
-              data.result.baseline.name, data.result.baseline.metrics, data.result.name, data.result.metrics
-            ));
-          }
-        }
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    }
-    tick();
-  });
-}
-
-async function runExperiment() {
-  const statusEl = document.getElementById('status');
-  const errorEl = document.getElementById('error');
-  const resultsEl = document.getElementById('results');
-  const progressEl = document.getElementById('progress');
-  const runBtn = document.getElementById('run-btn');
-  errorEl.textContent = '';
-  resultsEl.innerHTML = '';
-  progressEl.innerHTML = '';
-  statusEl.textContent = 'Starting: this spawns real relay subprocesses...';
-  runBtn.disabled = true;
-  try {
-    const resp = await fetch('/api/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ yaml_text: document.getElementById('yaml').value }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      throw new Error(data.detail || `HTTP ${resp.status}`);
-    }
-    statusEl.textContent = `Running ${data.name}...`;
-    await pollUntilDone(progressEl);
-  } catch (e) {
-    statusEl.textContent = '';
-    errorEl.textContent = 'Error: ' + e.message;
-  } finally {
-    runBtn.disabled = false;
-  }
-}
-
-function fmt(v) {
-  if (v === null || v === undefined) return 'nan';
-  if (typeof v === 'number' && !Number.isInteger(v)) return v.toFixed(4);
-  return String(v);
-}
-
-function escapeHtml(s) {
-  // Experiment names come from user-editable YAML (the submitted config,
-  // and whatever config a baseline: field points to), so they're
-  // untrusted text, not markup, by the time they reach a template
-  // string headed for innerHTML.
-  const div = document.createElement('div');
-  div.textContent = String(s);
-  return div.innerHTML;
-}
-
-function metricsTable(name, metrics) {
-  const table = document.createElement('table');
-  table.innerHTML = `<caption>${escapeHtml(name)}</caption><tr><th>metric</th><th>value</th></tr>` +
-    Object.entries(metrics).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(v)}</td></tr>`).join('');
-  return table;
-}
-
-function compareTable(baseName, baseMetrics, treatName, treatMetrics) {
-  const keys = [...new Set([...Object.keys(baseMetrics), ...Object.keys(treatMetrics)])].sort();
-  const safeBaseName = escapeHtml(baseName);
-  const safeTreatName = escapeHtml(treatName);
-  const table = document.createElement('table');
-  table.innerHTML = `<caption>Baseline comparison (${safeBaseName} vs ${safeTreatName})</caption>` +
-    `<tr><th>metric</th><th>${safeBaseName}</th><th>${safeTreatName}</th></tr>` +
-    keys.map(k => `<tr><td>${k}</td><td>${fmt(baseMetrics[k])}</td><td>${fmt(treatMetrics[k])}</td></tr>`).join('');
-  return table;
-}
-</script>
+<script type="module" src="/static/app.js"></script>
 </body>
 </html>
