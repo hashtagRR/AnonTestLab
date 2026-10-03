@@ -28,6 +28,20 @@ def test_policy_factors():
     assert model.policy_factor("iid", 1.0, 2, 20.0, 2.0, 0.5) == 1.0
 
 
+def test_cover_factor_uses_the_observed_share_of_the_cover():
+    # i.i.d. leg (p = 0.5) of counts with dispersion F and Poisson cover at rho
+    # times the real rate split like real cells: the combined effective share
+    # is 1 / (1 + (1 - p + rho) / (p F)).
+    m, f, p = 10.0, 21.0, 0.5
+    for rho in (0.0, 1.0, 4.0):
+        combined = (model.policy_factor("iid", p, 2, m, 1.0, 0.25, f)
+                    * model.cover_factor("iid", p, m, f, rho * m)) ** 2
+        assert combined == pytest.approx(1 / (1 + (1 - p + rho) / (p * f)), rel=1e-9)
+    # full observation keeps the earlier form sqrt(F / (F + rho))
+    assert model.cover_factor("iid", 1.0, m, f, 4 * m) == pytest.approx(math.sqrt(f / (f + 4)), rel=1e-9)
+    assert model.cover_factor("iid", p, m, f, 0.0) == 1.0
+
+
 def test_delay_factor_of_a_constant_shift():
     config = _config(mix_strategy="constant", mix_delay_ms=200.0)  # 3 hops: 0.6 s
     kappa = model.delay_factors(config, 0.25, 4)

@@ -105,6 +105,30 @@ def policy_factor(
     return float("nan")
 
 
+def observed_variance(policy: str, p: float, cells_per_bin: float, dispersion: float = 1.0) -> float:
+    """Variance of the observed share's real-cell count per bin, in cells
+    squared, for the same policies as policy_factor (other policies use the
+    i.i.d. value)."""
+    m, d = cells_per_bin, max(dispersion, 1e-12)
+    if p >= 1.0:
+        return m * d
+    if policy == "round_robin":
+        return p * p * m * d + 1.0 / 12.0
+    if policy == "batch":
+        return p * m * d + p * (1.0 - p) * m * m
+    return p * m * (1.0 + p * (d - 1.0))
+
+
+def cover_factor(policy: str, p: float, cells_per_bin: float, dispersion: float, cover_per_bin: float) -> float:
+    """Correlation loss from independent Poisson cover seen on the entry side
+    only. Cover is split over the legs like real cells, so the observed share
+    p carries p * cover_per_bin cover cells per bin next to its real counts."""
+    if cover_per_bin <= 0:
+        return 1.0
+    v = observed_variance(policy, p, cells_per_bin, dispersion)
+    return math.sqrt(v / (v + p * cover_per_bin)) if v > 0 else 0.0
+
+
 def observed_share(config) -> float:
     weights = config.split_weights or [1.0] * config.num_paths
     legs = config.observed_legs if config.observed_legs is not None else range(config.num_paths)
@@ -140,7 +164,8 @@ def simulated_scores(config, lag_max_s: float, n_flows: int = 100, seed: int = 0
     bins, and the smearing of each burst by the delay, correlate
     neighbouring bins on both sides, which widens the null (Bartlett) and
     correlates the lag scores; this calibration captures both. Independent
-    Poisson cover is added on the entry side only."""
+    Poisson cover is added on the entry side only, assigned to the legs by
+    the same scheduler and in the same time order as the emulator sends it."""
     gen = get_generator(config.real_traffic_distribution, config.real_rate,
                         burst_mean_cells=config.burst_mean_cells, burst_gap_ms=config.burst_gap_ms)
     rng = random.Random(seed)
@@ -155,11 +180,16 @@ def simulated_scores(config, lag_max_s: float, n_flows: int = 100, seed: int = 0
             leg_rtt_s=[ms / 1000.0 for ms in config.split_leg_rtt_ms] if config.split_leg_rtt_ms else None,
             leg_window=config.split_leg_window,
         )
-        seen = np.array([sched.assign(float(x), rng) in observed for x in t], dtype=bool)
-        entry = t[seen]
-        if config.cover_rate > 0:
-            cover = nrng.uniform(0.0, config.duration_s, nrng.poisson(config.cover_rate * config.duration_s))
-            entry = np.sort(np.concatenate([entry, cover]))
+        cover = (np.sort(nrng.uniform(0.0, config.duration_s, nrng.poisson(config.cover_rate * config.duration_s)))
+                 if config.cover_rate > 0 else np.zeros(0))
+        times = np.concatenate([t, cover])
+        is_real = np.concatenate([np.ones(len(t), bool), np.zeros(len(cover), bool)])
+        order = np.argsort(times, kind="stable")
+        on_leg = np.zeros(len(times), bool)
+        for i in order:
+            on_leg[i] = sched.assign(float(times[i]), rng) in observed
+        seen = on_leg[is_real]
+        entry = np.sort(times[on_leg])
         leaving = t if config.egress_observation == "merged" else t[seen]
         ingress.append(entry.tolist())
         egress.append(np.sort(leaving + sample_added_delay(config, len(leaving), nrng)).tolist())
@@ -204,8 +234,8 @@ def predict(config, fpr: float = 1e-3, psi: float = 0.9, base_rate: float = 1e-4
         m, d = traffic_moments(config, w)
         burst = 1.0 if d == 1.0 else 1.0 / math.sqrt((1.0 - 1.0 / d) * delay_spread(config, w, lags) + 1.0 / d)
         gamma = policy_factor(policy, p, config.num_paths, m, config.split_batch_mean_s, w, d)
-        # independent Poisson cover adds variance c w next to the real variance lam w D
-        cover = math.sqrt(lam * d / (lam * d + config.cover_rate)) if lam > 0 else 0.0
+        # independent Poisson cover on the observed legs adds variance p c w next to their real variance
+        cover = cover_factor(policy, p, m, d, config.cover_rate * w) if lam > 0 else 0.0
         r = gamma * float(kappa.max()) * burst * cover
         out[f"model_dispersion_w{w}"] = d
         mu_true = math.sqrt(bins) * r
