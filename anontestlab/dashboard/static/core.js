@@ -138,6 +138,26 @@ export function fmtMetric(key, v) {
   return num(v);
 }
 
+/** Same unit conversion as fmtMetric (ms, %, x), with a +/- sign, for a
+ * delta shown beside fmtMetric-formatted A/B columns - so e.g. a one-way
+ * delay delta reads "+0.3 ms" next to "0.9 ms" / "0.6 ms", not a bare
+ * seconds figure like "3.00e-4" that silently drops the unit the other
+ * two columns are in. */
+export function signedMetric(key, v) {
+  if (typeof v !== 'number') return 'n/a';
+  const formatted = fmtMetric(key, v);
+  // A tiny negative value can round to "-0.0 ms" / "-0%" at the display
+  // precision above; that reads as a negative change when it is really
+  // indistinguishable from none at the shown precision, so the sign is
+  // dropped once the rounded leading number is zero (an exponential tail
+  // like "1.00e-7" is left alone: that notation already carries its own
+  // sign meaningfully, at full precision).
+  const lead = /^-?\d+(?:\.\d+)?/.exec(formatted);
+  const isZero = lead !== null && Number(lead[0]) === 0;
+  const unsigned = isZero && formatted.startsWith('-') ? formatted.slice(1) : formatted;
+  return (v > 0 && !isZero ? '+' : '') + unsigned;
+}
+
 export function kindBadge(kind) {
   const map = { run: ['Run', 'blue'], sweep: ['Sweep', 'amber'], paired: ['Paired', 'green'],
     compare: ['Compare', ''], fidelity: ['Fidelity', 'green'] };
@@ -228,8 +248,16 @@ export const job = {
     try {
       const since = this.events.length;
       const s = await api(`/api/status?since=${since}`);
-      if (this.state && s.started_at !== this.state.started_at) this.events = [];
-      if (s.events_total < this.events.length) this.events = [];
+      // Polls can overlap (the shell and a view both poll on a fresh load):
+      // a reply to a `since` that is no longer current would append the same
+      // events twice, so only the reply matching the current count is used.
+      if (this.events.length !== since) return;
+      // A new job, or the server restarted: its events count from 0, so read
+      // them again from the start instead of appending from the old offset.
+      if (since > 0 && ((this.state && s.started_at !== this.state.started_at) || s.events_total < since)) {
+        this.events = [];
+        return this.poll();
+      }
       this.events.push(...s.events);
       const wasActive = this.state && this.state.active;
       this.state = s;
@@ -332,6 +360,10 @@ export function errorBox(e) {
   return html`<div class="callout bad" role="alert">${e && e.message ? e.message : String(e)}</div>`;
 }
 
-export function metricCard(label, value, sub = '') {
-  return html`<div class="card metric"><div class="label">${label}</div><div class="value">${value}</div>${sub ? html`<div class="sub">${sub}</div>` : ''}</div>`;
+/** warn: true flags a caveat that changes how the headline value should be
+ * read (e.g. an uncalibrated/optimistic threshold) - not just a plain
+ * footnote, so it gets a visible triangle and warning color rather than
+ * the same quiet grey as a normal "sub" caption like a unit or a count. */
+export function metricCard(label, value, sub = '', warn = false) {
+  return html`<div class="card metric${warn ? ' warn' : ''}"><div class="label">${label}</div><div class="value">${value}</div>${sub ? html`<div class="sub">${warn ? '⚠ ' : ''}${sub}</div>` : ''}</div>`;
 }

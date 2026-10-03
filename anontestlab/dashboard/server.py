@@ -814,13 +814,27 @@ async def api_output_bundle(run_id: str) -> Response:
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+def _report_module():
+    """The PDF builder, or a 503 naming the fix when matplotlib is missing:
+    without this a fresh install without the extra returned a bare 500
+    and the browser saved that error as a broken report.pdf."""
+    try:
+        from . import report
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f'PDF reports need matplotlib ({e}). Install it with: pip install -e ".[dashboard]"',
+        ) from e
+    return report
+
+
 @app.get("/api/outputs/{run_id:path}/report.pdf")
 async def api_output_report(run_id: str) -> Response:
     """Dispatches by the output's own kind: a run report for a run, a
     paired-analysis report for a paired output. A comparison has no
     single id to hang this route off of (it names two runs); its report
     is the separate /api/compare/report.pdf below."""
-    from . import report
+    report = _report_module()
 
     try:
         kind = store.output_detail(RESULTS_ROOT, run_id)["kind"]
@@ -839,7 +853,7 @@ async def api_output_report(run_id: str) -> Response:
 
 @app.get("/api/compare/report.pdf")
 async def api_compare_report(a: str, b: str) -> Response:
-    from . import report
+    report = _report_module()
 
     try:
         data = await asyncio.to_thread(report.build_compare_report, RESULTS_ROOT, a, b)

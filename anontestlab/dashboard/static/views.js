@@ -1,9 +1,9 @@
 // Workbench views: experiments library, runs, live job, results, artifacts.
 import {
   $, JOB_ROUTE, ago, api, bytes, copy, defenseText, designText, duration, enc, errorBox, fmtMetric, html,
-  job, kindBadge, meta, metricCard, mount, ms, num, outputs, pageHead, pct, raw, trafficText,
+  job, kindBadge, local, meta, metricCard, mount, ms, num, outputs, pageHead, pct, raw, trafficText,
 } from './core.js';
-import { SERIES, circuitDiagram, createTopologyLayout, densityChart, lineChart, pathDiagram, topologyGraph } from './charts.js';
+import { SERIES, createTopologyLayout, densityChart, lineChart, multipathDiagram, pathDiagram, topologyGraph } from './charts.js';
 
 // ------------------------------------------------- suite metric parsing
 
@@ -47,10 +47,16 @@ export async function experimentsView(el) {
   const runs = all.filter((o) => o.kind === 'run');
   const examples = Object.keys(m.templates).filter((k) => k.startsWith('example:'));
   const live = job.state && job.state.active && job.state.kind === 'run' ? job.state.label : null;
+  // #/new alone restores an unfinished draft (builder.js's local.get('atl.draft')
+  // fallback) if one was left behind; #/new?template=blank always starts fresh.
+  // Two buttons to "the same place" only when there's no draft to resume, so
+  // the resume option is offered only when there actually is one.
+  const draft = local.get('atl.draft');
 
   mount(el, html`
     ${pageHead('Experiments', 'Build controlled anonymous-network experiments, run them locally, and keep enough evidence to compare or reproduce the result.',
-      html`<a class="btn" href="#/new">Open builder</a><a class="btn primary" href="#/new?template=blank">New experiment</a>`)}
+      html`${draft ? html`<a class="btn" href="#/new" title="Continue the configuration you were last editing">Resume draft: ${draft.name || 'unnamed'}</a>` : ''}
+           <a class="btn primary" href="#/new?template=blank">New experiment</a>`)}
     <div class="grid g3">
       <div class="card template"><span><span class="badge blue"><span class="dot"></span>Start from a model</span></span>
         <h3>Tor-like baseline</h3><p>One 3-hop path, random relay selection, no cover traffic, no mixing.</p>
@@ -65,7 +71,7 @@ export async function experimentsView(el) {
     </div>
     <div class="section-title">Experiment library</div>
     <div class="card">
-      <div class="card-head"><div><h3>Stored runs</h3><p>Every run under <span class="mono">${m.results_root}</span>, from the CLI or this dashboard. Rerunning a name overwrites its directory.</p></div>
+      <div class="card-head"><div><h3>Stored runs</h3><p>Configurations you can reuse or compare, by design rather than by when they ran - every single run under <span class="mono">${m.results_root}</span>, from the CLI or this dashboard. Rerunning a name overwrites its directory. For sweeps, paired analyses and a plain activity feed of everything (including these), see <a class="link" href="#/runs">Runs</a>.</p></div>
         <input class="input" id="lib-filter" placeholder="Filter" style="width:200px" aria-label="Filter experiments"></div>
       ${runs.length || live ? html`<div class="table-wrap"><table class="table" id="lib">
         <thead><tr><th>Experiment</th><th>Design</th><th>Traffic</th><th>Defense</th><th>Adversaries</th><th>Last run</th><th>Status</th></tr></thead>
@@ -117,7 +123,7 @@ export async function runsView(el) {
   const all = await outputs(true);
   const s = job.state;
   mount(el, html`
-    ${pageHead('Runs', 'Everything under results/: experiment runs and the analyses built from them. One job runs at a time, because concurrent relays would add host noise to each other\'s timing.')}
+    ${pageHead('Runs', 'A chronological feed of everything under results/ - runs, sweeps, paired analyses and compares - regardless of kind. To browse just the run configurations by their design instead, see <a class="link" href="#/experiments">Experiments</a>. One job runs at a time, because concurrent relays would add host noise to each other\'s timing.')}
     ${s && s.kind ? html`<div class="card" style="margin-bottom:16px"><div class="card-head">
       <div><h3>${s.active ? 'Running now' : 'Last job'}: ${s.label}</h3><p>${s.kind}, started ${ago(s.started_at)}${s.error ? ', failed' : ''}</p></div>
       <a class="btn ${s.active ? 'primary' : ''}" href="#/runs/live">${s.active ? 'Watch progress' : 'Open job log'}</a></div></div>` : ''}
@@ -231,14 +237,14 @@ export function liveView(el) {
         <div class="card" style="margin-bottom:16px"><div class="timeline" id="live-phases"></div></div>
         <div class="grid g4" id="live-cards" style="margin-bottom:16px"></div>
         <div class="card" style="margin-bottom:16px" id="live-circuit-card">
-          <div class="card-head"><div><h3>Live circuit</h3><p>The real relay processes, and the most recent session's actual chosen path. Not every executed session, just the latest one.</p></div></div>
+          <div class="card-head"><div><h3>Live paths</h3><p>The most recent session's real legs, drawn between one sender and one receiver: every relay is an actual relay process, a relay shared by several legs (a common exit) is drawn once where they converge, and leg shares are this session's measured real packets. Not every executed session, just the latest one.</p></div></div>
           <div class="card-body stack">
             <div class="relay-grid" id="live-relays"></div>
-            <div class="path-diagram" id="live-circuit-diagram"><div class="empty">Waiting for a session to build a circuit.</div></div>
+            <div class="path-diagram mp" id="live-circuit-diagram"><div class="empty">Waiting for a session to build a circuit.</div></div>
           </div>
         </div>
         <div class="card" style="margin-bottom:16px" id="live-topology-card">
-          <div class="card-head"><div><h3>Relay connectivity</h3><p>Built from every session's actual chosen relays so far, this run only. Node positions are a physics layout, not a geographic or physical network map.</p></div></div>
+          <div class="card-head"><div><h3>Relay connectivity</h3><p>Every session's actual legs so far, this run only, between the same sender and receiver. Thicker edges carried more legs. Relay positions are a physics layout, not a geographic or physical network map.</p></div></div>
           <div class="card-body"><div id="live-topology"><div class="empty">Waiting for sessions to build circuits.</div></div></div>
         </div>
         <div class="grid g2" style="margin-bottom:16px">
@@ -276,10 +282,15 @@ export function liveView(el) {
     const diagramBox = $('#live-circuit-diagram', el);
     if (diagramBox && latestCircuit) {
       const circuitKey = `${latestCircuit.step}:${latestCircuit.session_id}`;
-      mount(diagramBox, html`
-        ${raw(circuitDiagram(latestCircuit.paths, { failed: latestCircuit.type === 'session_failed' }))}
-        <div class="hint" style="margin-top:4px">session s-${String(latestCircuit.session_id).padStart(3, '0')}${latestCircuit.type === 'session_failed' ? ', failed' : ', real relay ids'}</div>`);
+      // Redrawn only when a new session lands: every poll would restart the
+      // packet animation from scratch.
       if (circuitKey !== lastCircuitKey) {
+        const isFailed = latestCircuit.type === 'session_failed';
+        const legs = latestCircuit.paths.length;
+        mount(diagramBox, html`
+          ${raw(multipathDiagram(latestCircuit.paths, { failed: isFailed, sessionId: latestCircuit.session_id,
+            legSent: latestCircuit.leg_real_sent || null, legDelivered: latestCircuit.leg_real_delivered || null }))}
+          <div class="hint" style="margin-top:4px">session s-${String(latestCircuit.session_id).padStart(3, '0')}, ${legs} leg${legs > 1 ? 's' : ''}${isFailed ? ', failed before completing' : latestCircuit.leg_real_sent ? ', leg % = share of real packets' : ''}. Hover a relay for its role in each leg.</div>`);
         lastCircuitKey = circuitKey;
         diagramBox.classList.remove('circuit-flash');
         void diagramBox.offsetWidth; // restart the CSS animation on a diagram that was already flashed once
@@ -293,20 +304,32 @@ export function liveView(el) {
         topologyEpoch = epoch;
         topologyLayout.reset();
       }
-      const nodes = new Set(ready ? Array.from({ length: ready.num_nodes }, (_, i) => `n${i}`) : []);
+      // Sender and receiver are pinned at the two edges and joined to each
+      // leg's entry and exit, so the aggregate reads as routes between them.
+      const SENDER = '@sender', RECEIVER = '@receiver';
+      const nodes = new Set([SENDER, RECEIVER, ...(ready ? Array.from({ length: ready.num_nodes }, (_, i) => `n${i}`) : [])]);
       const edges = new Map();
+      const bump = (a, b) => { const key = [a, b].sort().join('|'); edges.set(key, (edges.get(key) || 0) + 1); };
       for (const e of circuitEvents) {
         for (const leg of e.paths) {
           leg.forEach((id) => nodes.add(id));
-          for (let i = 0; i < leg.length - 1; i++) {
-            const key = [leg[i], leg[i + 1]].sort().join('|');
-            edges.set(key, (edges.get(key) || 0) + 1);
-          }
+          for (let i = 0; i < leg.length - 1; i++) bump(leg[i], leg[i + 1]);
+          if (leg.length) { bump(SENDER, leg[0]); bump(leg[leg.length - 1], RECEIVER); }
         }
       }
       if (nodes.size) {
-        topologyLayout.step(nodes, edges, { width: 600, height: 340 });
-        topologyGraph(topoBox, { layout: topologyLayout, nodes, edges, lit: new Set(latestCircuit ? latestCircuit.paths.flat() : []) });
+        const pinned = { [SENDER]: { x: 40, y: 170 }, [RECEIVER]: { x: 560, y: 170 } };
+        // Each relay is pulled toward its average hop position across the
+        // legs that used it: entries near the sender, exits near the receiver.
+        const hopPos = new Map();
+        for (const e of circuitEvents) for (const leg of e.paths) leg.forEach((id, h) => {
+          const t = leg.length === 1 ? 0.5 : h / (leg.length - 1);
+          hopPos.set(id, [...(hopPos.get(id) || []), t]);
+        });
+        const targetX = Object.fromEntries([...hopPos].map(([id, ts]) => [id, 120 + (ts.reduce((a, b) => a + b, 0) / ts.length) * 360]));
+        topologyLayout.step(nodes, edges, { width: 600, height: 340, pinned, targetX });
+        topologyGraph(topoBox, { layout: topologyLayout, nodes, edges, lit: new Set(latestCircuit ? latestCircuit.paths.flat() : []),
+          height: 340, anchors: { [SENDER]: 'Sender', [RECEIVER]: 'Receiver' } });
       }
     }
     mount($('#live-progress', el), html`
@@ -339,7 +362,10 @@ export function liveView(el) {
 export async function resultsView(el, { id, query }) {
   if (!id) {
     const latest = (await outputs(true)).find((o) => o.kind === 'run');
-    if (latest) { location.replace(`#/results/${latest.id}`); return; }
+    // Marks that this id was picked automatically (not navigated to by name),
+    // so the page can say so instead of silently landing on one run out of
+    // however many exist with no sign there's a list behind it.
+    if (latest) { location.replace(`#/results/${latest.id}?latest=1`); return; }
     mount(el, html`${pageHead('Results', '')}<div class="card empty">No runs yet. <a class="link" href="#/new">Build an experiment</a>.</div>`);
     return;
   }
@@ -350,10 +376,23 @@ export async function resultsView(el, { id, query }) {
   const s = d.summary;
   const suite = suiteIndex(mt);
   const hasModel = Object.keys(modelIndex(mt)).length > 0;
-  const tabs = [['summary', 'Summary'], ['adversary', 'Adversaries'], ...(hasModel ? [['model', 'Model']] : []), ['paths', 'Paths'], ['raw', 'Raw metrics']];
+  // The Adversaries tab is the correlation_suite's own per-attacker table
+  // (TPR/AUC/mu_hat per bin width/quantile) - every other adversary's
+  // headline numbers (global observer, path compromise, hop depth,
+  // watermark) already live on Summary. Offered only when there's suite
+  // data to show, so clicking it is never a dead end pointing back at the
+  // tab you're already on.
+  const tabs = [['summary', 'Summary'], ...(suite.ids.length ? [['adversary', 'Adversaries']] : []),
+                ...(hasModel ? [['model', 'Model']] : []), ['paths', 'Paths'], ['raw', 'Raw metrics']];
   const failed = mt.sessions_failed;
+  let latestNote = '';
+  if (query.get('latest') === '1') {
+    const runCount = (await outputs()).filter((o) => o.kind === 'run').length;
+    if (runCount > 1) latestNote = html`<p class="hint" style="margin:0 0 10px">Most recent of ${runCount} runs &middot; <a class="link" href="#/runs">see all</a></p>`;
+  }
 
   mount(el, html`
+    ${latestNote}
     ${pageHead(d.config.name, `Seed ${s.seed}, ${s.sessions} sessions, ${s.nodes} relays. Written ${ago(d.mtime)}. Single-run result.`,
       html`<a class="btn" href="#/artifacts/${id}">Evidence</a><a class="btn" href="/api/outputs/${enc(id)}/report.pdf" download>Download PDF</a>
            <a class="btn" href="#/new?from=${encodeURIComponent(id)}">Edit as new</a>
@@ -403,8 +442,16 @@ async function summaryTab(body, id, d, suite) {
   blocks.push(html`<div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Latency CDF</h3><p>Empirical distribution of entry-to-exit delay across every delivered real packet, not just the p50/p95/p99 above.</p></div></div>
     <div class="card-body"><div id="latency-cdf"></div><p class="hint" id="latency-cdf-note" style="margin:6px 0 0"></p></div></div>`);
   if (advs.includes('global_observer')) {
+    // mt.test_sessions (decision.evaluate_scores, via global_observer.py) is
+    // this adversary's OWN calibration/test split, set only when
+    // adversary.evaluation.calibration_fraction > 0 - separate from, and not
+    // to be confused with, the correlation_suite adversary's identically
+    // shaped but differently named suite_test_sessions a few sections down,
+    // which is about a different (optional) set of attackers entirely.
+    const uncalibrated = !mt.test_sessions;
     blocks.push(html`<div class="section-title">Global observer</div><div class="grid g4">
-      ${metricCard('TPR at FPR 1e-3', num(mt['tpr_at_fpr_0.001']), mt.suite_test_sessions ? 'calibrated threshold' : 'threshold from the same pairs')}
+      ${metricCard('TPR at FPR 1e-3', num(mt['tpr_at_fpr_0.001']),
+        uncalibrated ? 'optimistic: threshold fit on these same test pairs' : 'calibrated threshold', uncalibrated)}
       ${metricCard('Realized FPR', num(mt['realized_fpr_0.001']), 'at the chosen threshold')}
       ${metricCard('FPR support', num(mt['fpr_support_0.001'], 1), 'expected false positives')}
       ${metricCard('AUC', num(mt.auc), 'Pearson correlation score')}</div>`);
@@ -425,7 +472,7 @@ async function summaryTab(body, id, d, suite) {
       </div>
       <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Attacker matrix</h3><p>No metric is colored good or bad: the direction depends on the research question.</p></div></div><div class="table-wrap" id="matrix"></div></div>`);
   }
-  if ((d.summary.paths || 1) > 1) blocks.push(html`<div class="section-title">Path design</div>${pathsCard(d)}`);
+  if ((d.summary.paths || 1) > 1) blocks.push(pathsSummaryCard(d, id));
   mount(body, blocks);
 
   try {
@@ -550,6 +597,26 @@ export function modelTab(body, mt, predictions) {
   lineChart($('#mu-chart', body), { series, markers: true, xTicks: widths.map(Number), xLabel: 'bin width (s)', yLabel: 'mu hat', xFormat: (v) => `${v}`, aria: 'signal estimate by bin width', endLabels: true });
 }
 
+/** Summary's own compact mention of a multipath design: the measured
+ * per-leg traffic share only, with a link to the Paths tab for the full
+ * diagram and merge/observation details - that card (pathsCard, just
+ * below) used to be embedded here in full, so a multipath run showed the
+ * identical card twice: once on Summary, once as the entire Paths tab. */
+function pathsSummaryCard(d, id) {
+  const c = d.config;
+  const paths = [{ length: c.path_length }, ...(c.extra_paths || []).map((p) => ({ length: p.path_length }))];
+  const shares = paths.map((_, i) => d.metrics[`leg_${i}_real_share`]);
+  const colors = ['var(--s1)', 'var(--s3)', 'var(--s2)', 'var(--s4)'];
+  const hasShares = paths.length > 1 && shares.every((x) => typeof x === 'number');
+  return html`<div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Path design</h3><p>${paths.length} paths, ${c.merge === 'common_exit' ? 'common exit' : 'disjoint'}.</p></div>
+    <a class="btn small" href="#/results/${id}?tab=paths">Full diagram</a></div>
+    <div class="card-body">${hasShares ? html`
+      <div class="summary-row"><span>Measured real-traffic share per leg</span><span>${c.split_strategy}</span></div>
+      <div class="stackbar" role="img" aria-label="leg shares">${shares.map((x, i) => html`<span style="width:${x * 100}%;background:${raw(colors[i % 4])}" title="leg ${i}: ${pct(x)}"></span>`)}</div>
+      <div class="legend" style="margin-top:8px">${shares.map((x, i) => html`<span><i class="sw" style="background:${raw(colors[i % 4])}"></i>Path ${i + 1}: ${pct(x)}</span>`)}</div>`
+      : html`<p class="hint">No per-leg traffic measured for this run.</p>`}</div></div>`;
+}
+
 function pathsCard(d) {
   const c = d.config;
   const paths = [{ length: c.path_length }, ...(c.extra_paths || []).map((p) => ({ length: p.path_length }))];
@@ -628,7 +695,7 @@ function reproduceCommand(d) {
 export async function artifactsView(el, { id }) {
   if (!id) {
     const all = await outputs(true);
-    mount(el, html`${pageHead('Artifacts', 'Pick an output to inspect its evidence: the files needed to check or reproduce it.')}
+    mount(el, html`${pageHead('Artifacts', 'Pick any output to inspect its evidence: the files needed to check or reproduce it, for runs and for the sweeps, paired analyses and compares built from them. Also reachable from an "Evidence" link wherever one appears, for the output you were already looking at.')}
       <div class="card">${all.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Output</th><th>Kind</th><th>Written</th></tr></thead>
         <tbody>${all.map((o) => html`<tr class="clickable" data-href="#/artifacts/${o.id}"><td><b>${o.id}</b></td><td>${kindBadge(o.kind)}</td><td>${ago(o.mtime)}</td></tr>`)}</tbody></table></div>` : html`<div class="empty">Nothing under results/ yet.</div>`}</div>`);
     el.addEventListener('click', (evt) => { const tr = evt.target.closest('tr[data-href]'); if (tr) location.hash = tr.dataset.href; });

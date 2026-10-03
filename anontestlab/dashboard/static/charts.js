@@ -29,9 +29,33 @@ function extent(values, pad = 0) {
   const v = values.filter((x) => Number.isFinite(x));
   if (!v.length) return [0, 1];
   let lo = Math.min(...v), hi = Math.max(...v);
+  // Every value sits inside [0, 1]: almost certainly a probability, rate
+  // or share (TPR, AUC, delivery rate, ...), which can't go outside that
+  // interval - so the axis is clamped there too, instead of padding a
+  // flat line at 1.0 out to e.g. 1.100. Harmless for any other metric:
+  // it only bites once the (unpadded) data already sits at 0 or 1, which
+  // a duration or count in normal units never does.
+  const unit = lo >= 0 && hi <= 1;
   if (lo === hi) { lo -= Math.abs(lo) * 0.1 || 1; hi += Math.abs(hi) * 0.1 || 1; }
   const p = (hi - lo) * pad;
-  return [lo - p, hi + p];
+  lo -= p; hi += p;
+  if (unit) { lo = Math.max(0, lo); hi = Math.min(1, hi); }
+  return [lo, hi];
+}
+
+// niceTicks() rounds in the data's raw units, which can print the same
+// label twice once a coarser formatter is applied (two sub-millisecond
+// values both showing "0.8 ms") - this keeps the first tick of each
+// distinct label and drops the repeat.
+function dedupeTicks(ticks, format) {
+  const out = [];
+  let last = null;
+  for (const t of ticks) {
+    const label = format(t);
+    if (label !== last) out.push(t);
+    last = label;
+  }
+  return out;
 }
 
 function tooltip(el) {
@@ -86,10 +110,15 @@ export function lineChart(el, opts) {
   const r = series.length > 1 || opts.endLabels ? PAD.r : 18;
   const sx = scale(x0, x1, PAD.l, W - r, opts.xLog);
   const sy = scale(y0, y1, H - PAD.b, PAD.t);
-  const xt = opts.xTicks || (opts.xLog ? logTicks(x0, x1) : niceTicks(x0, x1));
-  const yt = niceTicks(y0, y1, 4);
+  // Explicit xTicks are real configured values (one per data point): kept
+  // as-is even if two happen to format alike, so no point silently loses
+  // its axis label. The auto-generated numeric ticks (niceTicks/logTicks,
+  // and the y-axis always) are deduped.
+  const autoXt = opts.xTicks || (opts.xLog ? logTicks(x0, x1) : niceTicks(x0, x1));
+  const xt = opts.xTicks ? autoXt : dedupeTicks(autoXt, xf);
+  const yt = dedupeTicks(niceTicks(y0, y1, 4), yf);
 
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(opts.aria || opts.yLabel || 'chart')}">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${escapeHtml(opts.aria || opts.yLabel || 'chart')}">`;
   s += '<g class="axis">';
   for (const t of yt) {
     s += `<line class="gridline" x1="${PAD.l}" x2="${W - r}" y1="${sy(t)}" y2="${sy(t)}"/>`;
@@ -184,7 +213,7 @@ export function densityChart(el, { edges, a, b, aName, bName, height = 240, xLab
     vals.forEach((v, i) => { d += `L${sx(edges[i])},${sy(v)}L${sx(edges[i + 1])},${sy(v)}`; });
     return d + `L${sx(edges[n])},${sy(0)}Z`;
   };
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="score distributions"><g class="axis">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="score distributions"><g class="axis">`;
   for (const t of niceTicks(edges[0], edges[n])) s += `<text x="${sx(t)}" y="${H - PAD.b + 16}" text-anchor="middle">${escapeHtml(num(t, 2))}</text>`;
   for (const t of niceTicks(0, top * 1.1, 3)) {
     s += `<line class="gridline" x1="${PAD.l}" x2="${W - 18}" y1="${sy(t)}" y2="${sy(t)}"/>`;
@@ -221,8 +250,8 @@ export function slopeChart(el, { seeds, ref, treat, refName, treatName, yFormat 
   const [y0, y1] = extent([...ref, ...treat], 0.1);
   const sy = scale(y0, y1, H - PAD.b, PAD.t);
   const xa = 170, xb = 430;
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="matched seed outcomes"><g class="axis">`;
-  for (const t of niceTicks(y0, y1, 4)) {
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="matched seed outcomes"><g class="axis">`;
+  for (const t of dedupeTicks(niceTicks(y0, y1, 4), yFormat)) {
     s += `<line class="gridline" x1="${PAD.l}" x2="${W - 40}" y1="${sy(t)}" y2="${sy(t)}"/>`;
     s += `<text x="${PAD.l - 8}" y="${sy(t) + 3}" text-anchor="end">${escapeHtml(yFormat(t))}</text>`;
   }
@@ -257,7 +286,7 @@ export function intervalChart(el, { mean, lo, hi, margin, height = 170 }) {
   const span = Math.max(Math.abs(lo), Math.abs(hi), margin) * 1.35 || 1;
   const sx = scale(-span, span, PAD.l, W - 30);
   const y = 74;
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="paired difference interval"><g class="axis">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="paired difference interval"><g class="axis">`;
   for (const t of niceTicks(-span, span, 6)) s += `<text x="${sx(t)}" y="${H - 22}" text-anchor="middle">${escapeHtml(num(t, 3))}</text>`;
   s += `<line x1="${PAD.l}" x2="${W - 30}" y1="${H - 36}" y2="${H - 36}"/></g>`;
   s += `<rect x="${sx(-margin)}" y="24" width="${sx(margin) - sx(-margin)}" height="${H - 60}" fill="var(--seg)" stroke="var(--line)"/>`;
@@ -294,9 +323,13 @@ export function createTopologyLayout() {
     positions,
     reset() { positions.clear(); },
     /** nodes: Set<string> of relay ids seen so far. edges: Map<"a|b", count>. */
-    step(nodes, edges, { width = 600, height = 360, iterations = 50 } = {}) {
+    /** pinned: { id: {x, y} } nodes held fixed (the sender and receiver anchors).
+     *  targetX: { id: x } a horizontal position each node is pulled toward
+     *  (a relay's average hop position), so the graph reads left to right. */
+    step(nodes, edges, { width = 600, height = 360, iterations = 50, pinned = {}, targetX = {} } = {}) {
       const ids = [...nodes];
       if (!ids.length) return;
+      for (const [id, p] of Object.entries(pinned)) if (nodes.has(id)) positions.set(id, { ...p });
       const area = width * height;
       const k = Math.sqrt(area / Math.max(ids.length, 1)) * 0.9;
       for (const id of ids) {
@@ -344,7 +377,9 @@ export function createTopologyLayout() {
           disp.get(b).x += ux; disp.get(b).y += uy;
         }
         for (const id of ids) {
+          if (pinned[id]) continue;
           const d = disp.get(id);
+          if (targetX[id] !== undefined) d.x += (targetX[id] - positions.get(id).x) * k * 0.08;
           const len = Math.hypot(d.x, d.y) || 0.01;
           const p = positions.get(id);
           p.x += (d.x / len) * Math.min(len, temp);
@@ -359,10 +394,10 @@ export function createTopologyLayout() {
 }
 
 /** Renders the current layout (after step()) as an SVG node-link graph. */
-export function topologyGraph(el, { layout, nodes, edges, lit = new Set(), width = 600, height = 360 }) {
+export function topologyGraph(el, { layout, nodes, edges, lit = new Set(), width = 600, height = 360, anchors = {} }) {
   const pos = layout.positions;
   const maxWeight = Math.max(1, ...edges.values());
-  let s = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="relay connectivity graph">`;
+  let s = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="relay connectivity graph">`;
   for (const [key, weight] of edges) {
     const [a, b] = key.split("|");
     const pa = pos.get(a), pb = pos.get(b);
@@ -373,6 +408,11 @@ export function topologyGraph(el, { layout, nodes, edges, lit = new Set(), width
   for (const id of nodes) {
     const p = pos.get(id);
     if (!p) continue;
+    if (anchors[id]) {
+      s += `<rect x="${(p.x - 30).toFixed(1)}" y="${(p.y - 12).toFixed(1)}" width="60" height="24" rx="7" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/>`;
+      s += `<text x="${p.x.toFixed(1)}" y="${(p.y + 3.5).toFixed(1)}" text-anchor="middle" class="label" font-size="9" font-weight="600">${escapeHtml(anchors[id])}</text>`;
+      continue;
+    }
     const isLit = lit.has(id);
     const r = isLit ? 9 : 6.5;
     s += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" fill="${isLit ? 'var(--s1)' : 'var(--panel-2)'}" stroke="${isLit ? 'var(--s1)' : 'var(--faint)'}" stroke-width="1.5"/>`;
@@ -381,6 +421,112 @@ export function topologyGraph(el, { layout, nodes, edges, lit = new Set(), width
   s += "</svg>";
   el.classList.add("chart");
   el.innerHTML = s;
+}
+
+const LEG_COLORS = ['var(--s1)', 'var(--s3)', 'var(--s2)', 'var(--s4)'];
+
+/**
+ * One session's executed legs as routes between a single Sender and a
+ * single Receiver: each leg is a row of its real relay ids, a relay used by
+ * several legs (the common exit under routing.merge: common_exit) is drawn
+ * once where its legs converge, and packets flow along every leg. With
+ * legSent (the per-leg real packet counts from session_complete) each leg's
+ * label and packet density follow its measured share of the session's
+ * traffic; without it every leg is drawn alike.
+ */
+export function multipathDiagram(paths, { failed = false, legSent = null, legDelivered = null, sessionId = null } = {}) {
+  const L = paths.length;
+  const W = 760, pad = 52, rowGap = 74;
+  const H = Math.max(180, pad * 2 + (L - 1) * rowGap);
+  const S = { x: 64, y: H / 2 }, R = { x: W - 64, y: H / 2 };
+  const x0 = S.x + 120, x1 = R.x - 120;
+  const yOf = (i) => (L === 1 ? H / 2 : pad + (i * (H - 2 * pad)) / (L - 1));
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const role = (h, n) => (n === 1 ? 'only hop' : h === 0 ? 'entry' : h === n - 1 ? 'exit' : `hop ${h + 1}`);
+
+  // A relay sits at the mean of its occurrences, so a shared exit lands
+  // between the legs that converge on it.
+  const occ = new Map();
+  paths.forEach((leg, i) => leg.forEach((id, h) => {
+    const t = leg.length === 1 ? 0.5 : h / (leg.length - 1);
+    const o = occ.get(id) || { xs: [], ys: [], uses: [] };
+    o.xs.push(x0 + t * (x1 - x0)); o.ys.push(yOf(i)); o.uses.push([i, h, leg.length]);
+    occ.set(id, o);
+  }));
+  const pos = new Map([['@S', S], ['@R', R]]);
+  for (const [id, o] of occ) pos.set(id, { x: avg(o.xs), y: avg(o.ys) });
+
+  const total = legSent ? legSent.reduce((a, b) => a + b, 0) : 0;
+  const share = (i) => (total ? legSent[i] / total : null);
+  const color = (i) => (failed ? 'var(--bad-ink)' : LEG_COLORS[i % LEG_COLORS.length]);
+  const seg = (a, b) => { const m = (a.x + b.x) / 2; return `C${m.toFixed(1)},${a.y.toFixed(1)} ${m.toFixed(1)},${b.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`; };
+
+  // Edges, deduplicated: legs that share a hop pair (after a common exit)
+  // are drawn as one thicker merged edge.
+  const edgeLegs = new Map();
+  const routes = paths.map((leg, i) => {
+    const keys = ['@S', ...leg, '@R'];
+    for (let j = 0; j < keys.length - 1; j++) {
+      const k = `${keys[j]}>${keys[j + 1]}`;
+      edgeLegs.set(k, [...(edgeLegs.get(k) || []), i]);
+    }
+    const pts = keys.map((k) => pos.get(k));
+    return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)} ` + pts.slice(1).map((b, j) => seg(pts[j], b)).join(' ');
+  });
+
+  const legText = paths.map((leg, i) => `leg ${i + 1}: ${leg.join(', ')}${share(i) !== null ? ` (${Math.round(share(i) * 100)}% of real packets)` : ''}`).join('; ');
+  let out = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${escapeHtml(`${sessionId !== null ? `Session s-${String(sessionId).padStart(3, '0')}: ` : ''}${L} leg${L > 1 ? 's' : ''} from sender to receiver${failed ? ', failed' : ''}. ${legText}`)}">`;
+
+  for (const [k, legs] of edgeLegs) {
+    const [a, b] = k.split('>').map((id) => pos.get(id));
+    const merged = legs.length > 1;
+    out += `<path d="M${a.x.toFixed(1)},${a.y.toFixed(1)} ${seg(a, b)}" fill="none" stroke="${merged && !failed ? 'var(--ink)' : color(legs[0])}" stroke-width="${merged ? 4 : 2.5}" stroke-opacity="${failed ? 0.5 : merged ? 0.55 : 0.85}"${failed ? ' stroke-dasharray="6 5"' : ''}/>`;
+  }
+
+  if (!failed) {
+    out += '<g class="mp-packets" aria-hidden="true">';
+    routes.forEach((d, i) => {
+      const sh = share(i);
+      const dots = sh === null ? 3 : Math.max(1, Math.min(7, Math.round(sh * L * 3)));
+      const dur = 3.6;
+      for (let k = 0; k < dots; k++) {
+        out += `<circle r="4" fill="${color(i)}" stroke="var(--panel)" stroke-width="1.2"><animateMotion dur="${dur}s" repeatCount="indefinite" begin="${(-k * dur / dots).toFixed(2)}s" path="${d}"/></circle>`;
+      }
+    });
+    out += '</g>';
+  }
+
+  for (const [id, o] of occ) {
+    const p = pos.get(id);
+    const legsUsing = [...new Set(o.uses.map(([i]) => i))];
+    const shared = legsUsing.length > 1;
+    const stroke = shared ? (failed ? 'var(--bad-ink)' : 'var(--ink)') : color(legsUsing[0]);
+    const tip = o.uses.map(([i, h, n]) => `leg ${i + 1} ${role(h, n)}`).join(', ');
+    out += `<g><title>${escapeHtml(`${id}: ${tip}`)}</title>`;
+    if (shared) out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="22" fill="none" stroke="var(--faint)" stroke-width="1"/>`;
+    out += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="17" fill="var(--panel)" stroke="${stroke}" stroke-width="${shared ? 2.6 : 2}"/>`;
+    out += `<text x="${p.x.toFixed(1)}" y="${(p.y + 3.5).toFixed(1)}" text-anchor="middle" class="mp-t mono" font-size="10">${escapeHtml(id)}</text>`;
+    if (shared) {
+      const allExit = o.uses.every(([, h, n]) => h === n - 1);
+      out += `<text x="${p.x.toFixed(1)}" y="${(p.y + 36).toFixed(1)}" text-anchor="middle" class="mp-t mp-muted" font-size="9">${allExit ? 'shared exit' : `shared by legs ${legsUsing.map((i) => i + 1).join(', ')}`}</text>`;
+    }
+    out += '</g>';
+  }
+
+  paths.forEach((leg, i) => {
+    const first = pos.get(leg[0]);
+    const sh = share(i);
+    const delivered = legDelivered && legSent ? ` · ${legDelivered[i]}/${legSent[i]} delivered` : '';
+    const label = `${L > 1 ? `Leg ${i + 1}` : 'Circuit'}${sh !== null ? ` · ${Math.round(sh * 100)}%` : ''}`;
+    out += `<text x="${first.x.toFixed(1)}" y="${(first.y - 26).toFixed(1)}" text-anchor="middle" class="mp-t" font-size="10" font-weight="600" style="fill:${color(i)}"><title>${escapeHtml(label + delivered)}</title>${escapeHtml(label)}</text>`;
+  });
+
+  for (const [p, name, sub] of [[S, 'Sender', 'client'], [R, 'Receiver', 'destination']]) {
+    out += `<rect x="${p.x - 50}" y="${p.y - 22}" width="100" height="44" rx="10" fill="var(--panel)" stroke="${failed ? 'var(--bad-ink)' : 'var(--ink)'}" stroke-width="1.6"/>`;
+    out += `<text x="${p.x}" y="${p.y - 1}" text-anchor="middle" class="mp-t" font-size="12" font-weight="700">${name}</text>`;
+    out += `<text x="${p.x}" y="${p.y + 13}" text-anchor="middle" class="mp-t mp-muted" font-size="9">${sub}</text>`;
+  }
+  return out + '</svg>';
 }
 
 export function circuitDiagram(paths, { failed = false } = {}) {

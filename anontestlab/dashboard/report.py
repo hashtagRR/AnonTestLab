@@ -1,10 +1,10 @@
 """PDF reports: the same evidence the Results, Compare and Paired pages
 show, laid out as documents someone can save, print or attach to an
 email. Built with matplotlib's PdfPages rather than a browser print or a
-new dependency (reportlab, weasyprint): matplotlib is already required by
-anontestlab, and headless PDF generation needs no display, no extra
-package, and nothing tied to the headless-Chromium flakiness this
-sandbox has shown.
+heavier dependency (reportlab, weasyprint): matplotlib comes with the
+dashboard extra (pip install -e ".[dashboard]"), and headless PDF
+generation needs no display and nothing tied to the headless-Chromium
+flakiness this sandbox has shown.
 
 Charts here are deliberately simpler than the web page's interactive SVG
 charts (no hover, coarser detail): the goal is a readable static page, not
@@ -372,9 +372,15 @@ def _paired_page(pdf: PdfPages, run_id: str, detail: dict[str, Any]) -> None:
 
     rows = detail.get("rows") or []
     if rows:
-        ref_key, treat_key = s["reference"], s["treatment"]
-        ref_v = [r.get(ref_key) for r in rows]
-        treat_v = [r.get(treat_key) for r in rows]
+        # paired_runs.csv always uses fixed "reference"/"treatment" column
+        # names (see write_paired) so the two never collide into one key
+        # when the configs share a name; these are the display labels,
+        # disambiguated the same way for that case.
+        same_name = s["reference"] == s["treatment"]
+        ref_label = f"{s['reference']} (reference)" if same_name else s["reference"]
+        treat_label = f"{s['treatment']} (treatment)" if same_name else s["treatment"]
+        ref_v = [r.get("reference") for r in rows]
+        treat_v = [r.get("treatment") for r in rows]
         ax = fig.add_axes((0.11, 0.37, 0.8, 0.28))
         for rv, tv in zip(ref_v, treat_v):
             if isinstance(rv, (int, float)) and isinstance(tv, (int, float)):
@@ -383,14 +389,15 @@ def _paired_page(pdf: PdfPages, run_id: str, detail: dict[str, Any]) -> None:
                 ax.scatter([1], [tv], color=_S2, s=18, zorder=3)
         ax.set_xlim(-0.15, 1.15)
         ax.set_xticks([0, 1])
-        ax.set_xticklabels([ref_key, treat_key], fontsize=7.5)
+        ax.set_xticklabels([ref_label, treat_label], fontsize=7.5)
         _strip(ax)
         fig.text(0.11, 0.655, "Matched-seed outcomes", fontsize=10, color=_INK, weight="bold")
 
         ax2 = fig.add_axes((0.11, 0.08, 0.8, 0.22))
-        table_rows = [("Seed", ref_key, treat_key, "Delta")]
+        table_rows = [("Seed", ref_label, treat_label, "Delta")]
         for r in rows[:16]:
-            table_rows.append((str(r["seed"]), _fmt(r.get(ref_key)), _fmt(r.get(treat_key)), _fmt(r.get("delta"))))
+            table_rows.append((str(r["seed"]), _fmt(r.get("reference")), _fmt(r.get("treatment")),
+                                _fmt(r.get("delta"))))
         _table(ax2, table_rows)
         if len(rows) > 16:
             fig.text(0.11, 0.065, f"...and {len(rows) - 16} more seeds; see paired_runs.csv for all of them.",
