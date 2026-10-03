@@ -1,7 +1,10 @@
 """Dashboard tests. Skipped entirely if the optional dashboard deps
 aren't installed (pip install -e '.[dashboard]')."""
 import os
+import shutil
+import tempfile
 import time
+from pathlib import Path
 
 import pytest
 
@@ -9,7 +12,16 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient
 
-from anontestlab.dashboard.server import app
+from anontestlab.dashboard import server
+
+# Runs write under server.RESULTS_ROOT ("results/" by default, the same
+# directory `atl run` uses from the repo root). Pointed at a scratch
+# directory for the whole module so this file never touches, lists, or
+# overwrites a real experiment's output.
+_scratch_results = Path(tempfile.mkdtemp(prefix="atl-dashboard-tests-"))
+server.RESULTS_ROOT = _scratch_results
+
+app = server.app
 
 # Entered once for the whole module (not per-request) so a job's
 # background asyncio task keeps running on the same portal between polls.
@@ -21,6 +33,7 @@ client = _client_cm.__enter__()
 
 def teardown_module() -> None:
     _client_cm.__exit__(None, None, None)
+    shutil.rmtree(_scratch_results, ignore_errors=True)
 
 
 def _wait_for_result(timeout: float = 30.0) -> dict:
@@ -169,6 +182,27 @@ def test_run_reports_progress_and_writes_a_runnable_spec():
     assert "experiment.yaml" in [f["name"] for f in detail["files"]]
     spec = client.get("/api/outputs/dashboard-test/spec").text
     assert "name: dashboard-test" in spec
+
+    pytest.importorskip("matplotlib")
+    pdf = client.get("/api/outputs/dashboard-test/report.pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF-")
+
+
+def test_report_pdf_without_matplotlib_says_what_to_install(monkeypatch):
+    # A fresh install without the dashboard extra has no matplotlib; the
+    # route has to say so, not fail with a bare 500.
+    import sys
+
+    import anontestlab.dashboard as dashboard_pkg
+
+    monkeypatch.delattr(dashboard_pkg, "report", raising=False)
+    monkeypatch.setitem(sys.modules, "anontestlab.dashboard.report", None)
+    for url in ("/api/outputs/whatever/report.pdf", "/api/compare/report.pdf?a=x&b=y"):
+        resp = client.get(url)
+        assert resp.status_code == 503
+        assert 'pip install -e ".[dashboard]"' in resp.json()["detail"]
 
 
 def test_run_with_baseline_included_in_response(tmp_path):

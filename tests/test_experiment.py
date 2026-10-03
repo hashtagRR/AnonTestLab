@@ -3,6 +3,8 @@ subprocesses on real localhost ports, so they're slower than unit tests
 (seconds each). They stay fast through short durations and small
 networks, with nothing mocked."""
 
+import json
+
 from anontestlab.experiment import (
     ExperimentConfig,
     compare_experiments,
@@ -511,6 +513,30 @@ def test_paired_runs_both_configs_per_seed():
     assert result.reference_values == [1.0, 1.0]
     assert result.treatment_values == [1.0, 1.0]
     assert result.effect.classification == "no_meaningful_effect"
+
+
+def test_paired_runs_csv_keeps_reference_and_treatment_distinct_when_names_collide(tmp_path):
+    # Both configs named "same-name" (a plausible real case: the same base
+    # config, one field changed, the name left as-is). paired_runs.csv must
+    # not use the config name as its column header - two columns with the
+    # same header name would collapse into one key for any reader that
+    # parses the file as a dict per row (csv.DictReader included), silently
+    # losing the reference column to the treatment one.
+    ref = _small_config(name="same-name", num_sessions=3)
+    treat = _small_config(name="same-name", num_sessions=3, real_rate=8.0)
+    run_paired(ref, treat, seeds=[1, 2], metric="delivery_rate", resamples=200, out_dir=tmp_path)
+
+    import csv
+    with (tmp_path / "paired_runs.csv").open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert set(rows[0]) == {"seed", "reference", "treatment", "delta"}
+    assert len(rows) == 2
+    for row in rows:
+        assert row["reference"] != "" and row["treatment"] != ""
+        assert float(row["delta"]) == float(row["treatment"]) - float(row["reference"])
+
+    summary = json.loads((tmp_path / "paired_summary.json").read_text())
+    assert summary["reference"] == summary["treatment"] == "same-name"
 
 
 def test_held_out_calibration_reports_realized_fpr():

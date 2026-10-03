@@ -1,5 +1,5 @@
 // Hash router and app shell.
-import { $, $$, errorBox, html, job, local, mount } from './core.js';
+import { $, $$, errorBox, html, job, local, mount, toast } from './core.js';
 import { builderView } from './builder.js';
 import { artifactsView, experimentsView, liveView, resultsView, runsView } from './views.js';
 import { compareView, fidelityView, pairedView, predictView, sweepView } from './analyses.js';
@@ -81,6 +81,38 @@ function initTheme() {
     apply(theme);
   });
 }
+
+// PDF links are fetched before saving: a plain <a download> would save the
+// server's error response (no matplotlib, a missing run) as a broken
+// report.pdf with nothing on screen to say why.
+document.addEventListener('click', async (evt) => {
+  const a = evt.target.closest('a[download][href*="report.pdf"]');
+  if (!a || evt.button !== 0 || evt.metaKey || evt.ctrlKey || evt.shiftKey) return;
+  evt.preventDefault();
+  if (a.getAttribute('aria-busy') === 'true') return;
+  const label = a.textContent;
+  a.setAttribute('aria-busy', 'true');
+  a.textContent = 'Building PDF...';
+  try {
+    const r = await fetch(a.href);
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(typeof body.detail === 'string' ? body.detail : `${r.status} ${r.statusText}`);
+    }
+    const name = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '')?.[1] || 'report.pdf';
+    const url = URL.createObjectURL(await r.blob());
+    const tmp = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(tmp);
+    tmp.click();
+    tmp.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    toast(`PDF failed: ${e.message}`);
+  } finally {
+    a.textContent = label;
+    a.removeAttribute('aria-busy');
+  }
+});
 
 initTheme();
 job.subscribe(sideJob);

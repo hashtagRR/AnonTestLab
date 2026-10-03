@@ -134,6 +134,23 @@ const SECTIONS = [
 
 const ALL_FIELDS = SECTIONS.flatMap((s) => s.fields);
 
+/** key -> { section, label } for every field the builder edits, plus the
+ * handful of fields only reachable through a section's "custom" editor
+ * (paths, adversaries) rather than a plain fields[] entry - path_length,
+ * extra_paths and routing_strategy (routing), adversaries (adversary).
+ * Exported so the Compare page can group and label its raw config diff
+ * the same way the builder organizes these fields, instead of a flat,
+ * alphabetized list of snake_case keys from one shared source of truth,
+ * so the two can't drift apart. */
+export const FIELD_INFO = Object.fromEntries([
+  ...SECTIONS.flatMap((s) => s.fields.map((f) => [f.k, { section: s.title, label: f.label }])),
+  ['routing_strategy', { section: 'Routing and multipath', label: 'Relay selection' }],
+  ['path_length', { section: 'Routing and multipath', label: 'Hops' }],
+  ['extra_paths', { section: 'Routing and multipath', label: 'Extra paths' }],
+  ['adversaries', { section: 'Adversary', label: 'Adversary modules' }],
+]);
+export const SECTION_ORDER = SECTIONS.map((s) => s.title);
+
 function fieldInput(f, c, options) {
   const v = c[f.k];
   const id = `f-${f.k}`;

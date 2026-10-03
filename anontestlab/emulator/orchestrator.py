@@ -520,6 +520,8 @@ async def run_experiment_async(
                 paths=node_paths,
                 real_sent=real_sent,
                 real_delivered=real_delivered,
+                # measured real packets per leg, for the dashboard's live multipath view
+                leg_real_sent=list(obs.leg_real_counts),
                 build_delay_s=build_delay,
             )
 

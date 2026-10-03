@@ -1,10 +1,11 @@
 // Research tools: compare, sweep, paired, predict, fidelity.
 import {
   $, api, download, enc, errorBox, fmtMetric, html, job, meta, metricCard, mount, ms, num, outDirField, outputs,
-  pageHead, pct, pretty, raw, readOutDir, readSource, signed, sourcePicker, wireSourcePicker,
+  pageHead, pct, pretty, raw, readOutDir, readSource, signed, signedMetric, sourcePicker, wireSourcePicker,
 } from './core.js';
 import { SERIES, intervalChart, lineChart, slopeChart } from './charts.js';
 import { modelTab } from './views.js';
+import { FIELD_INFO, SECTION_ORDER } from './builder.js';
 
 async function suiteFor(runId) {
   try {
@@ -36,7 +37,12 @@ async function startJob(el, path, body) {
 
 function storedPicker(items, kind, current) {
   if (!items.length) return '';
-  return html`<select class="select" id="load-stored" style="width:auto" aria-label="Load a stored ${kind}">
+  // Capped rather than width:auto: a native <select> sizes to its longest
+  // (or currently selected) option, and a long stored id - e.g.
+  // "dashboard-paired-base_vs_dashboard-paired-base_paired" - would make
+  // the control balloon wide enough to push the buttons beside it onto
+  // their own line. The dropdown's own open menu still shows full ids.
+  return html`<select class="select picker" id="load-stored" aria-label="Load a stored ${kind}">
     <option value="">Load stored ${kind}...</option>${items.map((o) => html`<option value="${o.id}" ${o.id === current ? raw('selected') : ''}>${o.id}</option>`)}</select>`;
 }
 
@@ -113,19 +119,40 @@ export async function compareView(el, { query }) {
   $('#meta-a', el).textContent = `${d.a.name}, seed ${d.a.seed}`;
   $('#meta-b', el).textContent = `${d.b.name}, seed ${d.b.seed}`;
   const yamlish = (v) => (v === null ? 'null' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+  // Grouped by the same sections the builder itself edits these fields
+  // under (Network, Routing, Traffic, ...), with the builder's own field
+  // label beside the raw YAML key - a flat, alphabetized list of
+  // snake_case keys made it hard to tell what actually changed, and
+  // config values that were objects or lists (extra_paths, adversaries)
+  // ran off the edge of a <pre> block that didn't wrap.
+  const diffGroups = new Map();
+  for (const x of d.config_diff) {
+    const info = FIELD_INFO[x.key];
+    const section = info?.section || 'Other';
+    if (!diffGroups.has(section)) diffGroups.set(section, []);
+    diffGroups.get(section).push({ ...x, label: info?.label || x.key });
+  }
+  const orderedSections = [...SECTION_ORDER.filter((s) => diffGroups.has(s)), ...(diffGroups.has('Other') ? ['Other'] : [])];
   const head = d.rows.filter((r) => HEADLINE.includes(r.metric)).sort((x, y) => HEADLINE.indexOf(x.metric) - HEADLINE.indexOf(y.metric));
   const sameSeed = d.a.seed === d.b.seed;
   mount($('#cmp', el), html`
     <div class="grid g2">
       <div class="card"><div class="card-head"><div><h3>Configuration diff</h3><p>What changed comes before what moved.</p></div></div>
         <div class="card-body stack">
-          ${d.config_diff.length ? html`<pre class="code diff">${d.config_diff.map((x) => html`<span class="minus">- ${x.key}: ${yamlish(x.a)}</span>\n<span class="plus">+ ${x.key}: ${yamlish(x.b)}</span>\n`)}</pre>` : html`<div class="callout">The configurations are identical apart from the name.</div>`}
+          ${d.config_diff.length ? html`<div class="diff-groups">${orderedSections.map((section) => html`
+            <div class="diff-group"><h4>${section}</h4>
+              <table class="table"><tbody>${diffGroups.get(section).map((x) => html`<tr>
+                <td><div>${x.label}</div><div class="mono muted small">${x.key}</div></td>
+                <td><span class="minus">${yamlish(x.a)}</span></td>
+                <td><span class="plus">${yamlish(x.b)}</span></td>
+              </tr>`)}</tbody></table>
+            </div>`)}</div>` : html`<div class="callout">The configurations are identical apart from the name.</div>`}
           <div class="callout warn"><b>Scope:</b> this is a single-run comparison.${sameSeed ? ' The matched seed controls experiment choices, but' : ' The seeds differ, and'} runtime timing is still subject to process and socket scheduling. Use Paired for a multi-seed effect estimate.
             <div style="margin-top:8px"><a class="btn small" href="#/paired?ref=${encodeURIComponent(a)}&treat=${encodeURIComponent(b)}">Open paired analysis</a></div></div>
         </div></div>
       <div class="card"><div class="card-head"><div><h3>Outcome difference</h3><p>Delta is B minus A.</p></div></div>
         <div class="table-wrap"><table class="table"><thead><tr><th>Metric</th><th class="num">A</th><th class="num">B</th><th class="num">Delta</th></tr></thead>
-        <tbody>${head.map((r) => html`<tr><td>${pretty(r.metric)}</td><td class="num">${fmtMetric(r.metric, r.a)}</td><td class="num">${fmtMetric(r.metric, r.b)}</td><td class="num">${signed(r.delta)}</td></tr>`)}</tbody></table></div></div>
+        <tbody>${head.map((r) => html`<tr><td>${pretty(r.metric)}</td><td class="num">${fmtMetric(r.metric, r.a)}</td><td class="num">${fmtMetric(r.metric, r.b)}</td><td class="num">${signedMetric(r.metric, r.delta)}</td></tr>`)}</tbody></table></div></div>
     </div>
     <div class="card hidden" id="roc-overlay-card" style="margin-top:16px">
       <div class="card-head"><div><h3>Correlation resistance</h3><p>Same attacker, scored on each run's own held-out test sessions.</p></div>
@@ -331,9 +358,17 @@ async function pairedResult(el, id, paireds) {
   const s = d.summary;
   const [title, text, color] = VERDICT[s.classification] || [s.classification, '', 'amber'];
   const rows = d.rows || [];
-  const refKey = s.reference, treatKey = s.treatment;
+  // paired_runs.csv always writes fixed "reference"/"treatment" columns
+  // (see write_paired), never the configs' own names, so the two values
+  // can't collide into one key when a run was compared against another
+  // run sharing its name - a real case (the same base config, one field
+  // changed, name left as-is). refLabel/treatLabel are *display* text
+  // only, disambiguated the same way the PDF report disambiguates them.
+  const sameName = s.reference === s.treatment;
+  const refLabel = sameName ? `${s.reference} (reference)` : s.reference;
+  const treatLabel = sameName ? `${s.treatment} (treatment)` : s.treatment;
   mount(el, html`
-    ${pageHead('Paired multi-seed analysis', `${s.reference} vs ${s.treatment} on ${s.metric}.`,
+    ${pageHead('Paired multi-seed analysis', `${refLabel} vs ${treatLabel} on ${s.metric}.`,
       html`${storedPicker(paireds, 'analysis', id)}<a class="btn" href="#/artifacts/${id}">Evidence</a>
            <a class="btn" href="/api/outputs/${enc(id)}/report.pdf" download>Download PDF</a>
            <a class="btn primary" href="#/paired">New analysis</a>`)}
@@ -350,16 +385,16 @@ async function pairedResult(el, id, paireds) {
     </div>
     <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Analysis definition</h3><p>The inferential choices, kept beside the result.</p></div></div>
       <div class="card-body grid g2" style="gap:0 28px">
-        <div class="summary-row"><span>Reference</span><span>${s.reference}</span></div><div class="summary-row"><span>Treatment</span><span>${s.treatment}</span></div>
+        <div class="summary-row"><span>Reference</span><span>${refLabel}</span></div><div class="summary-row"><span>Treatment</span><span>${treatLabel}</span></div>
         <div class="summary-row"><span>Metric</span><span class="mono">${s.metric}</span></div><div class="summary-row"><span>Seeds</span><span class="mono">${rows.map((r) => r.seed).join(', ')}</span></div>
         <div class="summary-row"><span>CI method</span><span>paired bootstrap, 10,000 resamples</span></div><div class="summary-row"><span>Equivalence margin</span><span>+/-${num(s.margin)}</span></div>
       </div></div>
     <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Per-seed values</h3></div></div><div class="table-wrap"><table class="table">
-      <thead><tr><th>Seed</th><th class="num">${refKey}</th><th class="num">${treatKey}</th><th class="num">Delta</th></tr></thead>
-      <tbody>${rows.map((r) => html`<tr><td class="mono">${r.seed}</td><td class="num">${num(r[refKey])}</td><td class="num">${num(r[treatKey])}</td><td class="num">${signed(r.delta)}</td></tr>`)}</tbody></table></div></div>`);
+      <thead><tr><th>Seed</th><th class="num">${refLabel}</th><th class="num">${treatLabel}</th><th class="num">Delta</th></tr></thead>
+      <tbody>${rows.map((r) => html`<tr><td class="mono">${r.seed}</td><td class="num">${num(r.reference)}</td><td class="num">${num(r.treatment)}</td><td class="num">${signed(r.delta)}</td></tr>`)}</tbody></table></div></div>`);
   wireStored(el, 'paired');
-  const ok = rows.filter((r) => typeof r[refKey] === 'number' && typeof r[treatKey] === 'number');
-  slopeChart($('#slope', el), { seeds: ok.map((r) => r.seed), ref: ok.map((r) => r[refKey]), treat: ok.map((r) => r[treatKey]), refName: refKey, treatName: treatKey });
+  const ok = rows.filter((r) => typeof r.reference === 'number' && typeof r.treatment === 'number');
+  slopeChart($('#slope', el), { seeds: ok.map((r) => r.seed), ref: ok.map((r) => r.reference), treat: ok.map((r) => r.treatment), refName: refLabel, treatName: treatLabel });
   intervalChart($('#interval', el), { mean: s.mean_delta, lo: s.ci_low, hi: s.ci_high, margin: s.margin });
 }
 
@@ -369,6 +404,11 @@ export async function predictView(el, { query }) {
   const runs = runsOnly(await outputs(true));
   mount(el, html`
     ${pageHead('Analytical prediction', 'Estimate expected correlation behaviour without running relays, then set the model output against measured evidence.')}
+    <div class="callout" style="margin-bottom:16px">Closed-form predictions for the lag-aware correlator (A1): per-bin
+      correlation, signal, TPR at the suite's first FPR target, and confident linkage, from the configuration's traffic
+      rate and burstiness alone - no relays run and no traffic is generated. Pick a stored run to also set the model
+      against what the correlation suite actually measured on it; the "Model" chart and table below the metric tiles
+      is where that comparison shows up. Same numbers as <span class="mono">atl predict</span>.</div>
     <div class="card card-body row" style="align-items:flex-end">
       <div class="field" style="flex:1; min-width:240px"><label for="src">Configuration</label>${sourcePicker('src', runs, { selected: query.get('run') || '' })}</div>
       ${startButton('Run prediction')}
