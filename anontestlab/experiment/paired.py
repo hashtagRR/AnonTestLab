@@ -57,7 +57,14 @@ def run_paired(
 def write_paired(result: PairedResult, out_dir: Path) -> None:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    lines = [f"seed,{result.reference_name},{result.treatment_name},delta"]
+    # Fixed column names, not the configs' own names: reference and
+    # treatment commonly share a name (the same base config, one field
+    # changed), and a header of "seed,sweep-base,sweep-base,delta" would
+    # give both columns the same dict key once read back - silently
+    # losing the reference column to the treatment one wherever this CSV
+    # is parsed. reference_name/treatment_name are still carried in
+    # paired_summary.json for display.
+    lines = ["seed,reference,treatment,delta"]
     for s, r, t in zip(result.seeds, result.reference_values, result.treatment_values):
         lines.append(f"{s},{r},{t},{t - r}")
     (out_dir / "paired_runs.csv").write_text("\n".join(lines) + "\n")

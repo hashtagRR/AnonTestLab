@@ -13,6 +13,15 @@ class MetricsCollector:
     def record(self, packet: Packet) -> None:
         self.packets.append(packet)
 
+    def oneway_delays_s(self) -> list[float]:
+        """Sorted entry-to-exit delay of every delivered real packet. The
+        summary below only keeps p50/p95/p99 of this; callers that want
+        the full empirical distribution (a CDF, a histogram) need the raw
+        values, which live only in memory during the run unless a caller
+        persists this."""
+        delivered_real = [p for p in self.packets if p.kind == "real" and p.delivered]
+        return sorted(p.exit_at - p.created_at for p in delivered_real if p.exit_at is not None)
+
     def summary(self) -> dict[str, float]:
         real = [p for p in self.packets if p.kind == "real"]
         cover = [p for p in self.packets if p.kind == "cover"]
@@ -25,7 +34,7 @@ class MetricsCollector:
             statistics.quantiles(latencies, n=20)[18] if len(latencies) >= 20 else avg_latency
         )
         bandwidth_overhead = (len(real) + len(cover)) / len(real) if real else float("nan")
-        oneway = sorted(p.exit_at - p.created_at for p in delivered_real if p.exit_at is not None)
+        oneway = self.oneway_delays_s()
 
         return {
             "real_packets_sent": len(real),

@@ -19,6 +19,7 @@ class ExperimentResult:
     metrics: dict[str, float]
     baseline_result: ExperimentResult | None = None
     artifacts: dict[str, dict] = field(default_factory=dict)  # adversary name -> arrays written as <name>.npz
+    oneway_delays_s: list[float] = field(default_factory=list)  # every delivered packet; metrics keeps only percentiles
 
 
 def run_experiment(
@@ -59,7 +60,8 @@ def run_experiment(
         baseline_config = ExperimentConfig.from_yaml(config.baseline)
         baseline_result = run_experiment(baseline_config, _baseline_depth=_baseline_depth + 1)
 
-    result = ExperimentResult(config=config, metrics=metrics, baseline_result=baseline_result, artifacts=artifacts)
+    result = ExperimentResult(config=config, metrics=metrics, baseline_result=baseline_result, artifacts=artifacts,
+                              oneway_delays_s=collector.oneway_delays_s())
     if out_dir is not None:
         write_results(result, out_dir)
     return result
@@ -82,6 +84,12 @@ def write_results(result: ExperimentResult, out_dir: Path) -> None:
 
     for name, arrays in result.artifacts.items():
         np.savez_compressed(out_dir / f"{name}.npz", **arrays)
+
+    # Evidence for a chart that needs the full distribution, not just the
+    # p50/p95/p99 already in metrics.json. Skipped when empty (no
+    # delivered real packets) rather than writing an empty array file.
+    if result.oneway_delays_s:
+        np.savez_compressed(out_dir / "oneway_delays.npz", values=np.asarray(result.oneway_delays_s))
 
 
 def _to_yaml(d: dict) -> str:
