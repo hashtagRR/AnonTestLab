@@ -355,7 +355,7 @@
         <a href="#research" data-nav="research">Research</a>
         <a href="#limitations" data-nav="limitations">Scope</a>
         <a href="#license" data-nav="license">Free Software</a>
-        <a class="github" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">GitHub ↗</a>
+        <a class="github" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </nav>
   </div>
@@ -374,8 +374,8 @@
             <strong>real relay processes, real sockets, real per-hop cryptography</strong> and configurable adversaries.
           </p>
           <div class="hero-actions">
-            <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">View on GitHub ↗</a>
-            <a class="btn secondary" href="#workflow">See how it works ↓</a>
+            <a class="btn primary" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">View on GitHub</a>
+            <a class="btn secondary" href="#workflow">See how it works</a>
           </div>
         </div>
         <p class="hero-note">
@@ -509,7 +509,7 @@
         </div>
         <div class="need-points">
           <div class="need-point"><strong>Comparable</strong><span>Test different mechanisms in the same environment.</span></div>
-          <div class="need-point"><strong>Configurable</strong><span>Change research variables instead of rewriting infrastructure.</span></div>
+          <div class="need-point"><strong>Configurable</strong><span>Change research variables and keep the infrastructure as it is.</span></div>
           <div class="need-point"><strong>Observable</strong><span>Measure behavior directly from an executing local network.</span></div>
           <div class="need-point"><strong>Reproducible</strong><span>Preserve configuration, seeds, metrics and reports.</span></div>
           <div class="need-point"><strong>Adversary-aware</strong><span>Make observer capability an explicit experimental variable.</span></div>
@@ -553,7 +553,7 @@
 
       <div class="cap-grid">
         <article class="card reveal">
-          <div class="icon">↗</div>
+          <div class="icon">⋔</div>
           <h3>Routing & multipath</h3>
           <p>Compare single-path and multipath behavior with multiple path-selection and traffic-splitting policies.</p>
           <ul>
@@ -577,7 +577,7 @@
         <article class="card reveal">
           <div class="icon">◇</div>
           <h3>Real per-hop crypto</h3>
-          <p>Circuits perform telescoping handshakes and use selectable AEAD algorithms instead of adding an artificial crypto delay.</p>
+          <p>Circuits perform telescoping handshakes and use selectable AEAD algorithms, so the crypto cost is measured, with no artificial delay added.</p>
           <ul>
             <li>X25519, X448 and P-256 ECDHE</li>
             <li>AES-GCM, AES-GCM-SIV*, OCB3** and ChaCha20-Poly1305</li>
@@ -724,7 +724,7 @@
       <div class="limits-list reveal">
         <div class="limit"><strong>Custom wire protocol with Tor-inspired circuits.</strong><span>The project uses its own wire protocol and omits Tor's directory and consensus system.</span></div>
         <div class="limit"><strong>Fixed-size shaping is optional.</strong><span>Fixed-size padding is enabled only when traffic shaping is turned on.</span></div>
-        <div class="limit"><strong>Fixed-size cells still expose hop position.</strong><span>The current v0.4 construction can leak structural hop-depth information, which the framework can measure explicitly.</span></div>
+        <div class="limit"><strong>Fixed-size cells still expose hop position.</strong><span>The current v0.5 construction can leak structural hop-depth information, which the framework can measure explicitly.</span></div>
         <div class="limit"><strong>Relay identities are ephemeral.</strong><span>There is no persistent relay identity or reputation system.</span></div>
         <div class="limit"><strong>Bandwidth-weighted routing is simplified.</strong><span>Selection is weighted without Tor guard/exit flag constraints or positional rules.</span></div>
         <div class="limit"><strong>Latency scheduling uses nominal RTTs.</strong><span>The latency split policy schedules using configured round-trip times. The legs are not given different real latencies by that policy.</span></div>
@@ -756,7 +756,7 @@
           <p>
             The license supports practical reuse while keeping the project's free-software principles explicit.
           </p>
-          <a class="license-link" href="https://github.com/hashtagRR/AnonTestLab/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the GPL-3.0-or-later license ↗</a>
+          <a class="license-link" href="https://github.com/hashtagRR/AnonTestLab/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the GPL-3.0-or-later license</a>
         </div>
       </div>
     </div>
@@ -772,7 +772,7 @@
             Clone AnonTestLab, start with the Tor-like preset, then change the routing, traffic, defenses or adversary and measure the effect.
           </p>
         </div>
-        <a class="btn" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">Explore the repository ↗</a>
+        <a class="btn" href="https://github.com/hashtagRR/AnonTestLab" target="_blank" rel="noreferrer">Explore the repository</a>
       </div>
     </div>
   </section>
@@ -781,7 +781,7 @@
 <footer>
   <div class="wrap footerline">
     <span>AnonTestLab · Anonymous communication network experimentation</span>
-    <span>Research harness · v0.4 scope · GPL-3.0-or-later</span>
+    <span>Research harness · v0.5 · GPL-3.0-or-later</span>
   </div>
 </footer>
 

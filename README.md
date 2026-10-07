@@ -132,7 +132,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ```
 
 `atl run` and `atl wizard` print live progress as relays spawn and each
-session completes, so a multi-second run isn't a silent wait:
+session completes, so a multi-second run shows its progress:
 
 ```
 Running tor-like...
@@ -156,7 +156,7 @@ recall                         1.0000
 
 The dashboard shows the same progress live: it starts the run in the
 background and polls for updates, so the page stays responsive while the
-experiment runs.
+experiment runs, and draws each leg of the running session relay by relay.
 
 ## Writing an experiment
 
@@ -271,7 +271,7 @@ multi-path custom config.
 
 Notes:
 
-- Both are whole-experiment settings, fixed for every hop: every relay in a circuit must agree on them. The EXTEND cell's public-key field is length-prefixed rather than a fixed 32 bytes, so the wire format doesn't need to encode which curve is in use.
+- Both are whole-experiment settings, fixed for every hop: every relay in a circuit must agree on them. The EXTEND cell's public-key field is length-prefixed, so it fits every curve's key size and the wire format doesn't need to encode which curve is in use.
 - A larger handshake key (x448's 56 bytes, p256's 65-byte uncompressed point, vs x25519's 32) eats more of the fixed-size cell padding budget; a very small `cell_size` combined with a long path may need raising.
 - `aes256gcmsiv` needs `cryptography>=42.0` (pinned in pyproject.toml) built against OpenSSL 3.2+. The `cryptography` package's own prebuilt wheels satisfy this on every common platform, so a normal `pip install` needs nothing extra.
 
@@ -281,10 +281,14 @@ Notes:
 - `atl compare <yaml_a> <yaml_b>`: runs both, diffs every metric
 - `atl sweep <yaml> --param X --values a,b,c`: reruns one config varying a single field, one CSV row per value
 - `atl paired <ref_yaml> <treatment_yaml> --seeds 12 --metric tpr_at_fpr_0.001`: runs both configs under the same seeds, bootstraps the paired per-seed difference, and classifies it against an equivalence margin (`--margin`, default 0.05) as `meaningful_effect`, `no_meaningful_effect` (whole CI inside the margin) or `inconclusive`
-- `atl predict <yaml>`: prints the closed-form predictions for the lag-aware correlator (per-bin correlation, signal, TPR at FPR, confident linkage) for an experiment, without running it. The model takes the traffic's mean and index of dispersion per bin from the configured generator, so bursty traffic gets the dispersion forms of the split and delay factors (`model_dispersion_w<bin>` in the output)
+- `atl predict <yaml>`: prints the closed-form predictions for the lag-aware correlator (per-bin correlation, signal, TPR at FPR, confident linkage) for an experiment, without running it. The model takes the traffic's mean and index of dispersion per bin from the configured generator, so bursty traffic gets the dispersion forms of the split and delay factors (`model_dispersion_w<bin>` in the output). Cover traffic is split over the legs like real cells, so an observed leg carries its share of the cover
 - `atl fidelity <yaml>`: reruns an experiment's load with relay mixing switched off and reports the one-way delay that remains (host and link time). It passes when the 95th percentile, minus configured link latency, is at most 10% of the smallest per-hop mixing delay (or of the smallest attacker bin width when there is no mixing). Relays share one machine, so a failing load adds timing noise that looks like a defense; lower `sessions.max_concurrent` or use a larger machine.
 - `atl wizard`: walks through picking `tor_like` or `custom`, filling in parameters, reviewing the assembled YAML before running
-- `atl dashboard` (needs `pip install -e ".[dashboard]"`): a local web UI at `http://127.0.0.1:8765`: the same form as the wizard, generating the same YAML, plus an editable textarea for advanced options the form doesn't expose (traffic shaping, link conditions, AS groups, watermarking). Same `anontestlab.experiment.run_experiment` under the hood, just reached over HTTP.
+- `atl dashboard` (needs `pip install -e ".[dashboard]"`): a local web workbench at `http://127.0.0.1:8765`, running the same `anontestlab.experiment.run_experiment` as the CLI:
+  - **Builder:** every experiment option as a form, kept in sync with the YAML it generates (which can also be edited or loaded directly), with an output folder per run.
+  - **Live run:** progress per session, a sender-to-receiver drawing of each leg of the current session (legs sized by their measured share of real cells, a shared exit drawn once), the relay graph, and a stop button that ends the run's relay processes.
+  - **Results:** stored runs with their metrics, ROC and score-distribution charts, latency CDF, and downloads of the run folder as a zip and of a PDF report.
+  - **Research tools:** compare (two stored runs, or two new configs run and diffed in one step), sweep, paired, predict and fidelity, each on its own page with charts, and PDF reports for comparisons and paired analyses.
 
 ### Adversaries
 
@@ -294,7 +298,7 @@ Notes:
 - **`watermark`**: an active attack: a designated relay, always pinned to hop 1, delays every `period`-th real packet by a fixed amount, then checks whether the pattern survives to the observed exit timing. Best used with a single path per session.
 - **`hop_depth`**: structural like `path_compromise` (no packets need to move): once fixed-size cell padding is on, quantifies the disclosed hop-position leak directly from `cell_size`/`crypto_algorithm`. Reports whether an observer at one hop can recover its exact position from size alone (`hop_position_accuracy`, 1.0 once shaping is enabled) and whether an observer at hop 1 can tell circuits of different lengths apart from size alone (`path_length_leak_at_hop1`, 0.0 by design; `nan` if only one circuit length appears in the experiment).
 
-## Known limitations (v0.4)
+## Known limitations (v0.5)
 
 Simplifications of this version, stated so that results are read with them in mind:
 
@@ -303,7 +307,7 @@ Simplifications of this version, stated so that results are read with them in mi
 - **No relay identity or directory system.** Keys are ephemeral only, so there's no TOFU question to answer, but also no persistent relay reputation.
 - **Wave mode changes the timestamp origin.** With `sessions.max_concurrent`, each session's timestamps start at that session's own start, so flows from different waves line up as if concurrent. Without it, all sessions share the experiment clock.
 - **The `latency` split policy uses nominal RTTs.** Legs are not given different real latencies; only the scheduling decision follows the configured RTTs.
-- **`bandwidth_weighted` routing doesn't model guard/exit-flag constraints.** It selects without replacement in proportion to each node's configured weight, deliberately not replicating Tor's position rules.
+- **`bandwidth_weighted` routing doesn't model guard/exit-flag constraints.** It selects without replacement in proportion to each node's configured weight and leaves out Tor's position rules on purpose.
 - **Timing varies run to run.** The experiment *design* (path choices, traffic schedule) is reproducible from the seed, but real measured latency and timing will vary like any real system's would, since sessions run concurrently over real sockets and each relay subprocess has its own independent random state for loss/drop/watermark rolls.
 
 ## Extending it
@@ -330,9 +334,18 @@ from.
 
 Version 0.4 adds multipath split policies, relay mixing, a bursty traffic
 generator, training-free correlation attackers with model predictions, and
-a host-noise fidelity check. It is the measurement instrument of a paper in
-preparation on correlation risk in multipath anonymous communication; a
-reference will be added here on publication.
+a host-noise fidelity check. It is the measurement instrument of a paper on
+correlation risk in multipath anonymous communication, currently under
+review; a reference will be added here on publication.
+
+### Versions
+
+- **`v0.4.0`** (tag, commit 199deae) is the version the paper's experiments
+  ran. Its code matches the frozen bundle of the study apart from comments
+  and documentation.
+- **`v0.5.0`** adds the rebuilt dashboard with PDF reports and a fix to the
+  model's predictions for cover traffic on split legs (see `CHANGELOG.md`).
+  Measurements are unchanged.
 
 ## License
 

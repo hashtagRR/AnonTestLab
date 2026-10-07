@@ -38,7 +38,7 @@ Verify:
 
 ## Windows
 
-**Use a standard python.org CPython build, not the Python that ships
+**Use a standard python.org CPython build. Avoid the Python that ships
 inside MSYS2/Git Bash's `mingw64` environment.** MSYS2's Python has
 non-standard wheel tags, so pip usually can't find prebuilt packages for
 numpy/cryptography there and falls back to compiling them from source,
@@ -93,8 +93,8 @@ python -m pytest -q
 
 ### Using Git Bash instead of PowerShell
 
-Same idea, just invoke the launcher explicitly rather than letting
-`python3`/`python` resolve to whatever's first on `PATH`:
+Same idea, just invoke the launcher explicitly so that `python3`/`python`
+don't resolve to whatever's first on `PATH`:
 
 ```bash
 py -3.12 -m venv .venv
@@ -111,7 +111,7 @@ atl dashboard
 
 ## Windows-specific things worth knowing
 
-- **Loopback binding.** Each relay node binds its own address in `127.0.0.0/8` (`127.0.0.1`, `127.0.0.2`, ...). Windows has treated the whole `127.0.0.0/8` range as loopback since Vista, so this should work with no extra configuration, unlike macOS, which needs an explicit `ifconfig lo0 alias` for anything past `127.0.0.1`. This hasn't been verified against a live Windows run as part of this project yet: if you hit it, the symptom would be a `relay nN on port ... did not start in time` error from `spawn_relays`, not a silent hang. If you see that, it's the first thing to suspect.
+- **Loopback binding.** Each relay node binds its own address in `127.0.0.0/8` (`127.0.0.1`, `127.0.0.2`, ...). Windows has treated the whole `127.0.0.0/8` range as loopback since Vista, so this should work with no extra configuration, unlike macOS, which needs an explicit `ifconfig lo0 alias` for anything past `127.0.0.1`. This hasn't been verified against a live Windows run as part of this project yet: if you hit it, the symptom would be a `relay nN on port ... did not start in time` error from `spawn_relays`, raised quickly instead of a hang. If you see that, it's the first thing to suspect.
 - **First-run firewall prompt.** The first time you run an experiment, Windows Defender Firewall may prompt to allow `python.exe` to accept connections on a private network. That's expected: the relay subprocesses are real TCP servers on loopback. Allow it; nothing here needs to leave your machine (everything binds to `127.0.0.0/8`).
 - **Antivirus overhead.** Real-time scanning can add noticeable latency to spawning many short-lived `python.exe` processes. If experiments with a large `network.nodes` count feel slow to start on Windows relative to Linux, this is the likely reason. It doesn't affect correctness, only wall-clock startup time.
 
@@ -126,6 +126,6 @@ atl dashboard
   nothing else on the machine is bound to a huge range of loopback ports,
   and on Windows check the firewall prompt wasn't silently dismissed as
   "deny".
-- Tests hang instead of failing: this would be a real bug, not an
-  environment issue. Please report it with the OS, Python version, and
-  which test.
+- Tests hang instead of failing: this points to a real bug in AnonTestLab
+  and is unlikely to be an environment issue. Please report it with the OS,
+  Python version, and which test.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+- A rebuilt dashboard (`atl dashboard`): a multi-page workbench with an experiment builder kept in sync with its YAML, live run tracking with a per-leg circuit drawing and a stop button, stored results with charts, and pages for compare, sweep, paired, predict and fidelity.
+- PDF reports for a run, a comparison and a paired analysis, and a zip download of a run folder.
+
+### Changed
+- The `dashboard` extra now also installs matplotlib (for the PDF reports).
+
+### Fixed
+- Model predictions for cover traffic on split legs: a leg now carries its share of the cover, in both the closed form and the simulated impostor scores. Full-observation predictions and all measurements are unchanged.
+
 ## 0.4.0
 
 ### Added
