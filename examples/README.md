@@ -12,10 +12,22 @@ and the dashboard's builder produce the same files.
 | [`custom_multipath.yaml`](custom_multipath.yaml) | two paths with round-robin splitting; the adversary sees only one path |
 | [`mixnet_pool.yaml`](mixnet_pool.yaml) | Loopix/Nym-style pool mixing at every hop, with the `atl paired` command to measure what it buys |
 
-## Modes
+## Modes and sections
 
-`tor_like` (`experiment.mode: tor_like`) is a fixed preset. `custom`
-makes every section below configurable.
+`tor_like` (`experiment.mode: tor_like`) is a fixed preset: one path,
+three hops, no cover, no splitting. `custom` opens every section:
+
+| Section | What it sets |
+|---|---|
+| `network`, `sessions` | relay count, AS groups, number of sessions, wave size |
+| `routing` | paths, their selection strategy and length, and the [split policy](#multipath) across legs |
+| `traffic`, `cover_behaviour` | rates, distribution (`poisson`, `constant`, `pareto`, `burst`), cover traffic and where it is dropped |
+| `mixing` | relay-side delay at every hop: `constant`, `exponential`, `pool` |
+| `traffic_shaping` | fixed-size cell padding and a fixed-rate send schedule |
+| `crypto` | [per-hop AEAD and handshake curve](#crypto) |
+| `link_conditions` | latency, jitter, loss and bandwidth, uniform or varied per node and per link |
+| `adversary` | which [adversaries](../anontestlab/adversary/README.md) run, and what they can see |
+| `baseline` | another config to diff this run against |
 
 ## Every option
 

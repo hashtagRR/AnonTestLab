@@ -3,6 +3,19 @@
 All tools take the same experiment YAML files as `atl run` (see
 [the config reference](../examples/README.md)).
 
+## At a glance
+
+| Command | What it does |
+|---|---|
+| `atl run` | runs one experiment and prints its metrics |
+| `atl compare` | runs two configs and diffs every metric |
+| `atl sweep` | reruns one config over values of a single field |
+| `atl paired` | runs two configs under the same seeds and tests the difference |
+| `atl predict` | prints the model's predictions for a config without running it |
+| `atl fidelity` | checks that host timing noise is small enough for the result to hold |
+| `atl wizard` | builds a config interactively |
+| `atl dashboard` | a local web workbench for all of the above |
+
 ## Commands
 
 - `atl run <yaml>`: runs one experiment, prints one metrics table (plus a baseline diff if `baseline:` is set)
