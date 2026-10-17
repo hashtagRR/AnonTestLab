@@ -2,7 +2,7 @@
 
 **[hashtagRR.github.io/AnonTestLab](https://hashtagRR.github.io/AnonTestLab)**
 
-[![PyPI](https://img.shields.io/pypi/v/anontestlab.svg)](https://pypi.org/project/anontestlab/)
+[![PyPI](https://img.shields.io/pypi/v/anontestlab?label=PyPI)](https://pypi.org/project/anontestlab/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23211927.svg)](https://doi.org/10.5281/zenodo.23211927)
 
 <p align="center">
