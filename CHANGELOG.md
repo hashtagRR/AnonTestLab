@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.2 (2026-10-17)
+
 - Python 3.13 is tested in CI; the install guide no longer advises against it.
 - The tools guide installs the dashboard extra from PyPI.
 - The README badge shows the PyPI version, and the package metadata lists Python 3.9 to 3.13.
