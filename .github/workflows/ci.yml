@@ -13,12 +13,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.9 is the declared floor (requires-python in pyproject.toml);
-        # 3.11/3.12 are what INSTALL.md recommends. ubuntu-latest only:
+        # 3.9 is the declared floor (requires-python in pyproject.toml),
+        # 3.13 the newest supported release. ubuntu-latest only:
         # the emulator binds relay processes across 127.0.0.0/8, which
         # needs no extra setup on Linux, unlike macOS (needs `ifconfig
         # lo0 alias`) or Windows (never verified against a live run).
-        python-version: ["3.9", "3.11", "3.12"]
+        python-version: ["3.9", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 

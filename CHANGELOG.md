@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Python 3.13 is tested in CI; the install guide no longer advises against it.
+- The tools guide installs the dashboard extra from PyPI.
+
 ## 0.5.1 (2026-10-17)
 
 ### Changed

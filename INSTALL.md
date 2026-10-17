@@ -2,11 +2,9 @@
 
 ## Prerequisites
 
-Python 3.9 or later. **3.11 or 3.12 is strongly recommended**, especially
-on Windows. Very new Python versions (3.13+) sometimes don't have
-prebuilt wheels yet for numpy/cryptography on every platform, which
-forces pip to compile them from source: slow, and a much larger chance
-of hitting a broken toolchain.
+AnonTestLab needs Python 3.9 or later, and CI tests 3.9, 3.11, 3.12 and
+3.13. Its dependencies (numpy, cryptography, pyyaml) have prebuilt wheels
+for all four on Linux, macOS and Windows, so no compiler is needed.
 
 AnonTestLab is on PyPI, so the steps below install it with `pip install
 anontestlab` into a folder of its own. To change AnonTestLab itself, see
@@ -60,7 +58,7 @@ Open PowerShell and run:
 py -0
 ```
 
-Look for a `3.11` or `3.12` entry. If nothing suitable shows up, install
+Look for an entry from `3.9` to `3.13`. If nothing suitable shows up, install
 one from [python.org/downloads](https://www.python.org/downloads/), and
 during setup, check **"Add python.exe to PATH"**.
 
