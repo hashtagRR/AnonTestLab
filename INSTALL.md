@@ -8,11 +8,16 @@ prebuilt wheels yet for numpy/cryptography on every platform, which
 forces pip to compile them from source: slow, and a much larger chance
 of hitting a broken toolchain.
 
+AnonTestLab is on PyPI, so the steps below install it with `pip install
+anontestlab` into a folder of its own. To change AnonTestLab itself, see
+[From the source code](#from-the-source-code).
+
 ## GNU/Linux
 
 ```bash
+mkdir ~/anontestlab && cd ~/anontestlab
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
+.venv/bin/pip install anontestlab
 ```
 
 If `python3 -m venv` fails with something like `ensurepip is not
@@ -26,14 +31,14 @@ sudo apt install python3-venv
 Optional extras:
 
 ```bash
-.venv/bin/pip install -e ".[dashboard]"   # local web UI
+.venv/bin/pip install "anontestlab[dashboard]"   # local web UI
 ```
 
-Verify:
+Verify with an example config from the repository:
 
 ```bash
-.venv/bin/atl run examples/tor_like.yaml
-.venv/bin/python -m pytest -q
+curl -O https://raw.githubusercontent.com/hashtagRR/AnonTestLab/main/examples/tor_like.yaml
+.venv/bin/atl run tor_like.yaml
 ```
 
 ## Windows
@@ -62,7 +67,8 @@ during setup, check **"Add python.exe to PATH"**.
 ### 2. Create and activate the venv with that specific version
 
 ```powershell
-cd path\to\AnonTestLab
+mkdir $HOME\anontestlab
+cd $HOME\anontestlab
 py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
@@ -79,7 +85,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ```powershell
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install anontestlab
 ```
 
 This should pull prebuilt wheels for everything, no compiler needed.
@@ -87,8 +93,8 @@ This should pull prebuilt wheels for everything, no compiler needed.
 ### 4. Verify
 
 ```powershell
-atl run examples\tor_like.yaml
-python -m pytest -q
+curl.exe -O https://raw.githubusercontent.com/hashtagRR/AnonTestLab/main/examples/tor_like.yaml
+atl run tor_like.yaml
 ```
 
 ### Using Git Bash instead of PowerShell
@@ -98,16 +104,33 @@ don't resolve to whatever's first on `PATH`:
 
 ```bash
 py -3.12 -m venv .venv
-.venv/Scripts/pip install -e ".[dev]"
-.venv/Scripts/atl run examples/tor_like.yaml
+.venv/Scripts/pip install anontestlab
+.venv/Scripts/atl run tor_like.yaml
 ```
 
 ### Optional dashboard extra
 
 ```powershell
-pip install -e ".[dashboard]"
+pip install "anontestlab[dashboard]"
 atl dashboard
 ```
+
+## From the source code
+
+To change AnonTestLab, run its tests, or use the example configs in
+place, install it from a clone in editable mode instead:
+
+```bash
+git clone https://github.com/hashtagRR/AnonTestLab.git
+cd AnonTestLab
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev,dashboard]"
+.venv/bin/atl run examples/tor_like.yaml
+.venv/bin/python -m pytest -q
+```
+
+On Windows, create the venv with `py -3.12 -m venv .venv` as above and
+use `.venv\Scripts\` in place of `.venv/bin/`.
 
 ## Windows-specific things worth knowing
 
@@ -121,7 +144,7 @@ atl dashboard
   in cmake/ninja/rust: you're on a non-standard Python (MSYS2/mingw). Use
   `py -3.12` (or another python.org install) instead.
 - `ModuleNotFoundError` for `fastapi`/`uvicorn` when running `atl
-  dashboard`: install the optional extra, `pip install -e ".[dashboard]"`.
+  dashboard`: install the optional extra, `pip install "anontestlab[dashboard]"`.
 - A relay never reaches `READY` (`did not start in time` error): check
   nothing else on the machine is bound to a huge range of loopback ports,
   and on Windows check the firewall prompt wasn't silently dismissed as

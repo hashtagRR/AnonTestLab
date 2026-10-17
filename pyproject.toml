@@ -4,15 +4,28 @@ version = "0.5.0"
 description = "A simulation and experimentation framework for evaluating anonymous communication network designs"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "GPL-3.0-or-later" }
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+keywords = ["anonymity", "anonymous communication", "tor", "mixnet", "traffic correlation", "network emulation"]
 classifiers = [
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: System :: Networking",
 ]
 dependencies = [
     "pyyaml>=6.0",
     "numpy>=1.23",
     "cryptography>=42.0",
 ]
+
+[project.urls]
+Homepage = "https://hashtagRR.github.io/AnonTestLab"
+Source = "https://github.com/hashtagRR/AnonTestLab"
+Issues = "https://github.com/hashtagRR/AnonTestLab/issues"
+Changelog = "https://github.com/hashtagRR/AnonTestLab/blob/main/CHANGELOG.md"
 
 [project.scripts]
 atl = "anontestlab.cli:main"
@@ -23,7 +36,7 @@ dev = ["pytest>=7.0", "ruff>=0.11"]
 dashboard = ["fastapi>=0.100", "uvicorn>=0.23", "httpx", "matplotlib>=3.5"]
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

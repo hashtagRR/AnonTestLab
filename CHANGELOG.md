@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- AnonTestLab is on PyPI: `pip install anontestlab`. The README and the install guide use it; installing from the source code is described separately.
+- Package metadata: SPDX license expression, project links and classifiers. No code changes.
+
+### Added
+- Releases run from GitHub Actions (`.github/workflows/release.yml`): tests, version and changelog, PyPI upload with Trusted Publishing, and the GitHub release that Zenodo archives. See CONTRIBUTING.md.
+
 ## 0.5.0
 
 ### Added
