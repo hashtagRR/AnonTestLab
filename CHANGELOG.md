@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.1 (2026-10-17)
+
 ### Changed
 - AnonTestLab is on PyPI: `pip install anontestlab`. The README and the install guide use it; installing from the source code is described separately.
 - Package metadata: SPDX license expression, project links and classifiers. No code changes.
